@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', sans-serif;
+  color: #ffffff;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.06), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(255, 255, 255, 0.03), transparent 26%),
+    linear-gradient(155deg, #0f1115 0%, #11141a 45%, #0b0d11 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.06), transparent 24%),
+    radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.04), transparent 18%),
+    linear-gradient(155deg, #0f1115 0%, #11141a 45%, #0b0d11 100%);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+input:focus,
+button:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+}
+
+button,
+aside,
+section,
+div {
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(161, 161, 170, 0.22);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(161, 161, 170, 0.38);
+}
