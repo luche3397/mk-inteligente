@@ -5,6 +5,9 @@ export function Topbar({
   onExportData,
   onImportData,
   isImporting,
+  userEmail,
+  onLogout,
+  isLoggingOut,
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#2a2f3a] bg-white/[0.02] px-6 py-4 backdrop-blur-xl">
@@ -14,6 +17,7 @@ export function Topbar({
         <p className="mt-2 text-sm text-[#a1a1aa]">
           {contextLabel ?? ([selectedTitle?.title, selectedSection?.name].filter(Boolean).join(' / ') || 'Nenhum contexto selecionado')}
         </p>
+        {userEmail ? <p className="mt-2 text-xs text-[#7b818d]">{userEmail}</p> : null}
       </div>
 
       <div className="flex items-center gap-3">
@@ -28,6 +32,14 @@ export function Topbar({
           {isImporting ? 'Importando...' : 'Importar dados'}
           <input type="file" accept="application/json" className="hidden" onChange={onImportData} />
         </label>
+        <button
+          type="button"
+          onClick={onLogout}
+          disabled={isLoggingOut}
+          className="rounded-xl border border-[#3a404d] bg-transparent px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#2f3542] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isLoggingOut ? 'Saindo...' : 'Sair'}
+        </button>
       </div>
     </div>
   );

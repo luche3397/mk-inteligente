@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
+import { CadastroPage, LoginPage } from './components/auth-page';
 import { HtmlViewer } from './components/html-viewer';
 import { PublicLibrary } from './components/public-library';
 import { Sidebar } from './components/sidebar';
 import { TabBar } from './components/tab-bar';
 import { Topbar } from './components/topbar';
+import { useAuth } from './state/auth-context';
 import { useDashboard } from './state/dashboard-context';
 import { detectTabType, downloadJson } from './utils/dashboard';
 import { supabase } from '@/supabaseClient';
+
+const AUTH_PATHS = ['/login', '/cadastro'];
 
 const sanitizeFileName = (name) => {
   const extensionIndex = name.lastIndexOf('.');
@@ -30,12 +34,20 @@ const getFilePathFromUrl = (url) => {
   return parts[1] ?? '';
 };
 
+const getCurrentPath = () => {
+  const pathname = window.location.pathname || '/';
+  return pathname === '/' ? '/' : pathname.replace(/\/+$/, '');
+};
+
 function App() {
   const { state, selectedTitle, selectedSection, activeTab, actions } = useDashboard();
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const [pathname, setPathname] = useState(getCurrentPath);
   const [activeView, setActiveView] = useState('workspace');
   const [isImportingData, setIsImportingData] = useState(false);
   const [isImportingHtml, setIsImportingHtml] = useState(false);
   const [isImportingModule, setIsImportingModule] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [libraryModules, setLibraryModules] = useState([]);
   const [isLibraryLoading, setIsLibraryLoading] = useState(false);
   const [isLibraryUploading, setIsLibraryUploading] = useState(false);
@@ -47,6 +59,42 @@ function App() {
   const hasWorkspace = state.workspace.length > 0;
   const hasSection = state.workspace.some((item) => item.type === 'section');
   const availableSections = state.workspace.filter((item) => item.type === 'section');
+
+  const navigate = (nextPath, replace = false) => {
+    const resolvedPath = nextPath === '/' ? '/' : nextPath.replace(/\/+$/, '');
+
+    if (replace) {
+      window.history.replaceState({}, '', resolvedPath);
+    } else {
+      window.history.pushState({}, '', resolvedPath);
+    }
+
+    setPathname(resolvedPath);
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setPathname(getCurrentPath());
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (isAuthLoading) return;
+
+    const isAuthPath = AUTH_PATHS.includes(pathname);
+
+    if (!isAuthenticated && !isAuthPath) {
+      navigate('/login', true);
+      return;
+    }
+
+    if (isAuthenticated && isAuthPath) {
+      navigate('/', true);
+    }
+  }, [isAuthenticated, isAuthLoading, pathname]);
 
   const loadPublicModules = async () => {
     setIsLibraryLoading(true);
@@ -72,9 +120,9 @@ function App() {
   };
 
   useEffect(() => {
-    if (activeView !== 'library') return;
+    if (!isAuthenticated || activeView !== 'library') return;
     loadPublicModules();
-  }, [activeView]);
+  }, [activeView, isAuthenticated]);
 
   const updateCurrentTab = (payload) => {
     if (!selectedSection || !activeTab) return;
@@ -222,6 +270,28 @@ function App() {
       console.error('Erro ao importar modulo publico:', error);
       window.alert('Nao foi possivel importar o modulo para a secao selecionada.');
     }
+  };
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        throw error;
+      }
+
+      navigate('/login', true);
+    } catch (logoutError) {
+      console.error('Erro ao encerrar sessao:', logoutError);
+      window.alert('Nao foi possivel encerrar a sessao.');
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  const handleAuthenticated = () => {
+    navigate('/', true);
   };
 
   const handleExportData = () => {
@@ -416,35 +486,7 @@ function App() {
     );
   };
 
-  const renderContent = () => {
-    if (activeView === 'library') {
-      return (
-        <>
-          <input
-            ref={libraryInputRef}
-            type="file"
-            accept=".html,text/html"
-            className="hidden"
-            onChange={handleLibraryUpload}
-          />
-          <PublicLibrary
-            modules={libraryModules}
-            isLoading={isLibraryLoading}
-            isUploading={isLibraryUploading}
-            onUploadClick={() => libraryInputRef.current?.click()}
-            onModuleClick={(module) => window.open(module.file_url, '_blank', 'noopener,noreferrer')}
-            onDeleteModule={handleDeletePublicModule}
-            onImportModule={handleImportPublicModule}
-          />
-          {renderImportModal()}
-        </>
-      );
-    }
-
-    return renderWorkspaceContent();
-  };
-
-  return (
+  const renderWorkspace = () => (
     <div className="h-screen overflow-hidden bg-[#0f1115] text-white">
       <div className="flex h-full overflow-hidden">
         <Sidebar
@@ -474,12 +516,57 @@ function App() {
             onExportData={handleExportData}
             onImportData={handleImportData}
             isImporting={isImportingData}
+            userEmail={user?.email ?? ''}
+            onLogout={handleLogout}
+            isLoggingOut={isLoggingOut}
           />
-          <section className="min-h-0 flex-1 overflow-hidden">{renderContent()}</section>
+          <section className="min-h-0 flex-1 overflow-hidden">
+            {activeView === 'library' ? (
+              <>
+                <input
+                  ref={libraryInputRef}
+                  type="file"
+                  accept=".html,text/html"
+                  className="hidden"
+                  onChange={handleLibraryUpload}
+                />
+                <PublicLibrary
+                  modules={libraryModules}
+                  isLoading={isLibraryLoading}
+                  isUploading={isLibraryUploading}
+                  onUploadClick={() => libraryInputRef.current?.click()}
+                  onModuleClick={(module) => window.open(module.file_url, '_blank', 'noopener,noreferrer')}
+                  onDeleteModule={handleDeletePublicModule}
+                  onImportModule={handleImportPublicModule}
+                />
+                {renderImportModal()}
+              </>
+            ) : (
+              renderWorkspaceContent()
+            )}
+          </section>
         </main>
       </div>
     </div>
   );
+
+  if (isAuthLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0f1115] text-sm text-[#a1a1aa]">
+        Carregando sessao...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return pathname === '/cadastro' ? (
+      <CadastroPage onNavigate={navigate} onAuthenticated={handleAuthenticated} />
+    ) : (
+      <LoginPage onNavigate={navigate} onAuthenticated={handleAuthenticated} />
+    );
+  }
+
+  return renderWorkspace();
 }
 
 export default App;
