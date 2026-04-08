@@ -40,7 +40,7 @@ const getCurrentPath = () => {
 };
 
 function App() {
-  const { state, selectedTitle, selectedSection, activeTab, actions } = useDashboard();
+  const { state, selectedTitle, selectedSection, activeTab, isLoadingWorkspace, syncError, actions } = useDashboard();
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [pathname, setPathname] = useState(getCurrentPath);
   const [activeView, setActiveView] = useState('workspace');
@@ -520,8 +520,17 @@ function App() {
             onLogout={handleLogout}
             isLoggingOut={isLoggingOut}
           />
+          {syncError ? (
+            <div className="border-b border-[#3b1f25] bg-[#2a161a] px-6 py-3 text-sm text-[#f4c7cf]">
+              {syncError}
+            </div>
+          ) : null}
           <section className="min-h-0 flex-1 overflow-hidden">
-            {activeView === 'library' ? (
+            {isLoadingWorkspace ? (
+              <div className="flex h-full items-center justify-center text-sm text-[#a1a1aa]">
+                Carregando workspace...
+              </div>
+            ) : activeView === 'library' ? (
               <>
                 <input
                   ref={libraryInputRef}
