@@ -4,10 +4,9 @@ import { HtmlViewer } from './components/html-viewer';
 import { PublicLibrary } from './components/public-library';
 import { Sidebar } from './components/sidebar';
 import { TabBar } from './components/tab-bar';
-import { Topbar } from './components/topbar';
 import { useAuth } from './state/auth-context';
 import { useDashboard } from './state/dashboard-context';
-import { detectTabType, downloadJson } from './utils/dashboard';
+import { detectTabType } from './utils/dashboard';
 import { supabase } from '@/supabaseClient';
 
 const AUTH_PATHS = ['/login', '/cadastro'];
@@ -294,10 +293,6 @@ function App() {
     navigate('/', true);
   };
 
-  const handleExportData = () => {
-    downloadJson('workspace-dashboard.json', state);
-  };
-
   const renderEmptyWorkspace = () => (
     <div className="flex h-full items-center justify-center p-8">
       <div className="max-w-2xl rounded-[32px] border border-[#2a2f3a] bg-white/[0.04] p-8 text-center shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl">
@@ -493,6 +488,7 @@ function App() {
           workspace={state.workspace}
           selectedSectionId={state.selectedSectionId}
           isLibraryActive={activeView === 'library'}
+          isLoggingOut={isLoggingOut}
           onAddTitle={actions.addTitle}
           onAddSection={actions.addSection}
           onRenameTitle={actions.renameTitle}
@@ -506,20 +502,10 @@ function App() {
             actions.selectSection(sectionId);
           }}
           onOpenLibrary={() => setActiveView('library')}
+          onLogout={handleLogout}
         />
 
         <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-          <Topbar
-            selectedTitle={activeView === 'library' ? null : selectedTitle}
-            selectedSection={activeView === 'library' ? null : selectedSection}
-            contextLabel={activeView === 'library' ? 'Biblioteca Publica' : null}
-            onExportData={handleExportData}
-            onImportData={handleImportData}
-            isImporting={isImportingData}
-            userEmail={user?.email ?? ''}
-            onLogout={handleLogout}
-            isLoggingOut={isLoggingOut}
-          />
           {syncError ? (
             <div className="border-b border-[#3b1f25] bg-[#2a161a] px-6 py-3 text-sm text-[#f4c7cf]">
               {syncError}

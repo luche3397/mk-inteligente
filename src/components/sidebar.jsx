@@ -5,6 +5,7 @@ export function Sidebar({
   workspace,
   selectedSectionId,
   isLibraryActive,
+  isLoggingOut,
   onAddTitle,
   onAddSection,
   onRenameTitle,
@@ -15,6 +16,7 @@ export function Sidebar({
   onReorderItem,
   onSelectSection,
   onOpenLibrary,
+  onLogout,
 }) {
   const [draggedItemId, setDraggedItemId] = useState(null);
   const [dragOverItemId, setDragOverItemId] = useState(null);
@@ -190,6 +192,15 @@ export function Sidebar({
           }`}
         >
           Biblioteca Publica
+        </button>
+
+        <button
+          type="button"
+          onClick={onLogout}
+          disabled={isLoggingOut}
+          className="mt-3 w-full rounded-2xl border border-[#2a2f3a] bg-white/[0.03] px-4 py-3 text-left text-sm font-semibold text-white transition duration-200 hover:border-[#3a404d] hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isLoggingOut ? 'Saindo...' : 'Sair'}
         </button>
       </div>
     </aside>
