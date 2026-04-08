@@ -15,6 +15,7 @@ export const createTab = (name = 'Nova aba', overrides = {}) => ({
   type: 'html',
   content: '',
   fileUrl: null,
+  noteZoom: 1,
   ...overrides,
 });
 
@@ -46,7 +47,7 @@ const normalizeTab = (tab, index) => {
 
   const content =
     typeof tab.content === 'string' ? tab.content : typeof tab.htmlContent === 'string' ? tab.htmlContent : '';
-  const type = tab.type === 'module' || tab.type === 'html' ? tab.type : detectTabType(content);
+  const type = tab.type === 'module' || tab.type === 'html' || tab.type === 'note' ? tab.type : detectTabType(content);
 
   return {
     id: isUuid(tab.id) ? tab.id : createId(),
@@ -54,6 +55,7 @@ const normalizeTab = (tab, index) => {
     type,
     content,
     fileUrl: typeof tab.fileUrl === 'string' ? tab.fileUrl : null,
+    noteZoom: typeof tab.noteZoom === 'number' ? tab.noteZoom : 1,
   };
 };
 

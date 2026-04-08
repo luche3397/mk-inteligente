@@ -99,6 +99,7 @@ const parseTabContent = (value = '') => {
       type: 'html',
       content: '',
       fileUrl: null,
+      noteZoom: 1,
     };
   }
 
@@ -107,9 +108,10 @@ const parseTabContent = (value = '') => {
 
     if (parsed && typeof parsed === 'object') {
       return {
-        type: parsed.type === 'module' ? 'module' : 'html',
+        type: parsed.type === 'module' || parsed.type === 'note' ? parsed.type : 'html',
         content: typeof parsed.content === 'string' ? parsed.content : '',
         fileUrl: typeof parsed.fileUrl === 'string' ? parsed.fileUrl : null,
+        noteZoom: typeof parsed.noteZoom === 'number' ? parsed.noteZoom : 1,
       };
     }
   } catch {
@@ -120,14 +122,16 @@ const parseTabContent = (value = '') => {
     type: 'html',
     content: value,
     fileUrl: null,
+    noteZoom: 1,
   };
 };
 
 const serializeTabContent = (tab) =>
   JSON.stringify({
-    type: tab.type === 'module' ? 'module' : 'html',
+    type: tab.type === 'module' || tab.type === 'note' ? tab.type : 'html',
     content: typeof tab.content === 'string' ? tab.content : '',
     fileUrl: typeof tab.fileUrl === 'string' ? tab.fileUrl : null,
+    noteZoom: typeof tab.noteZoom === 'number' ? tab.noteZoom : 1,
   });
 
 const buildWorkspaceSnapshot = (workspace, userId, hiddenLeadingWorkspaceId) => {
@@ -308,6 +312,7 @@ export function DashboardProvider({ children }) {
             type: parsedContent.type,
             content: parsedContent.content,
             fileUrl: parsedContent.fileUrl,
+            noteZoom: parsedContent.noteZoom,
           });
           tabMap.set(tab.section_id, sectionTabs);
         });

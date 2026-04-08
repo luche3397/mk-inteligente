@@ -26,7 +26,7 @@ export function TabBar({ tabs, activeTabId, onAddTab, onSelectTab, onRenameTab, 
               />
 
               <span className="rounded-full border border-[#3a404d] bg-[#20232a]/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d4d4d8]">
-                {tab.type === 'module' ? 'Modulo' : 'HTML'}
+                {tab.type === 'module' ? 'Modulo' : tab.type === 'note' ? 'Nota' : 'HTML'}
               </span>
 
               <button

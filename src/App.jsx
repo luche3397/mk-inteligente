@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CadastroPage, LoginPage } from './components/auth-page';
 import { HtmlViewer } from './components/html-viewer';
+import { NoteEditor } from './components/note-editor';
 import { PublicLibrary } from './components/public-library';
 import { Sidebar } from './components/sidebar';
 import { TabBar } from './components/tab-bar';
@@ -366,7 +367,7 @@ function App() {
                   <div className="mt-1 flex items-center gap-3">
                     <h3 className="text-lg font-semibold text-white">{activeTab.name}</h3>
                     <span className="rounded-full border border-[#3a404d] bg-[#2a2f3a]/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-[#d4d4d8]">
-                      {activeTab.type === 'module' ? 'Modulo' : 'HTML'}
+                      {activeTab.type === 'module' ? 'Modulo' : activeTab.type === 'note' ? 'Nota' : 'HTML'}
                     </span>
                   </div>
                   <p className="mt-2 text-sm text-[#a1a1aa]">
@@ -391,6 +392,20 @@ function App() {
                   />
                   <button
                     type="button"
+                    onClick={() =>
+                      updateCurrentTab({
+                        type: 'note',
+                        content: activeTab?.type === 'note' ? activeTab.content : '',
+                        fileUrl: null,
+                        noteZoom: activeTab?.type === 'note' ? activeTab.noteZoom ?? 1 : 1,
+                      })
+                    }
+                    className="rounded-xl border border-[#3a404d] bg-transparent px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#2f3542]"
+                  >
+                    Nova Nota
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => htmlInputRef.current?.click()}
                     className="rounded-xl border border-[#3a404d] bg-[#20232a] px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#2f3542]"
                   >
@@ -407,7 +422,14 @@ function App() {
               </div>
 
               <div className="min-h-0 flex-1 overflow-auto p-5">
-                {activeTab.content || activeTab.fileUrl ? (
+                {activeTab.type === 'note' ? (
+                  <NoteEditor
+                    value={activeTab.content}
+                    zoom={activeTab.noteZoom ?? 1}
+                    onChange={(content) => updateCurrentTab({ content })}
+                    onZoomChange={(noteZoom) => updateCurrentTab({ noteZoom })}
+                  />
+                ) : activeTab.content || activeTab.fileUrl ? (
                   activeTab.type === 'module' ? (
                     <HtmlViewer
                       htmlContent={activeTab.content}
