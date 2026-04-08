@@ -1,12 +1,16 @@
 export const STORAGE_KEY = 'client-control-dashboard';
 
-const createId = (prefix) => `${prefix}-${crypto.randomUUID()}`;
+const isUuid = (value) =>
+  typeof value === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
+const createId = () => crypto.randomUUID();
 
 export const detectTabType = (content = '') =>
   /window\s*\.\s*nomadeModule\b/.test(content) ? 'module' : 'html';
 
 export const createTab = (name = 'Nova aba', overrides = {}) => ({
-  id: createId('tab'),
+  id: createId(),
   name,
   type: 'html',
   content: '',
@@ -15,14 +19,14 @@ export const createTab = (name = 'Nova aba', overrides = {}) => ({
 });
 
 export const createTitle = (title = 'Novo titulo') => ({
-  id: createId('title'),
+  id: createId(),
   type: 'title',
   title,
   color: '#ffffff',
 });
 
 export const createSection = (name = 'Nova secao', overrides = {}) => ({
-  id: createId('section'),
+  id: createId(),
   type: 'section',
   name,
   tabs: [],
@@ -45,7 +49,7 @@ const normalizeTab = (tab, index) => {
   const type = tab.type === 'module' || tab.type === 'html' ? tab.type : detectTabType(content);
 
   return {
-    id: typeof tab.id === 'string' ? tab.id : createId('tab'),
+    id: isUuid(tab.id) ? tab.id : createId(),
     name: typeof tab.name === 'string' && tab.name.trim() ? tab.name : `Aba ${index + 1}`,
     type,
     content,
@@ -54,14 +58,14 @@ const normalizeTab = (tab, index) => {
 };
 
 const normalizeTitleItem = (item, index) => ({
-  id: typeof item?.id === 'string' ? item.id : createId('title'),
+  id: isUuid(item?.id) ? item.id : createId(),
   type: 'title',
   title: typeof item?.title === 'string' && item.title.trim() ? item.title : `Titulo ${index + 1}`,
   color: typeof item?.color === 'string' && item.color.trim() ? item.color : '#ffffff',
 });
 
 const normalizeSectionItem = (item, index) => ({
-  id: typeof item?.id === 'string' ? item.id : createId('section'),
+  id: isUuid(item?.id) ? item.id : createId(),
   type: 'section',
   name: typeof item?.name === 'string' && item.name.trim() ? item.name : `Secao ${index + 1}`,
   tabs: Array.isArray(item?.tabs) ? item.tabs.map(normalizeTab) : [],
