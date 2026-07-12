@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CadastroPage, LoginPage } from './components/auth-page';
 import { HtmlViewer } from './components/html-viewer';
+import { PrivateLibrary } from './components/private-library';
 import { NoteEditor } from './components/note-editor';
 import { PublicLibrary } from './components/public-library';
 import { Sidebar } from './components/sidebar';
@@ -11,6 +12,7 @@ import { detectTabType } from './utils/dashboard';
 import { supabase } from '@/supabaseClient';
 
 const AUTH_PATHS = ['/login', '/cadastro'];
+const TAB_STATUSES = ['novo', 'em revisão', 'aprovado', 'publicado'];
 
 const sanitizeFileName = (name) => {
   const extensionIndex = name.lastIndexOf('.');
@@ -42,6 +44,21 @@ const readFileAsDataUrl = (file) =>
     reader.readAsDataURL(file);
   });
 
+const isPdfFile = (file) =>
+  file?.type === 'application/pdf' || file?.name?.toLowerCase().endsWith('.pdf');
+
+const getNextStatus = (currentStatus) => {
+  const currentIndex = TAB_STATUSES.indexOf(currentStatus);
+  return TAB_STATUSES[(currentIndex + 1 + TAB_STATUSES.length) % TAB_STATUSES.length] ?? 'novo';
+};
+
+const getStatusLabel = (status) => {
+  if (status === 'em revisão') return 'Em revisão';
+  if (status === 'aprovado') return 'Aprovado';
+  if (status === 'publicado') return 'Publicado';
+  return 'Novo';
+};
+
 const getCurrentPath = () => {
   const pathname = window.location.pathname || '/';
   return pathname === '/' ? '/' : pathname.replace(/\/+$/, '');
@@ -53,18 +70,20 @@ function App() {
   const [pathname, setPathname] = useState(getCurrentPath);
   const [activeView, setActiveView] = useState('workspace');
   const [isImportingData, setIsImportingData] = useState(false);
-  const [isImportingWorkspaceFile, setIsImportingWorkspaceFile] = useState(false);
-  const [isImportingPdf, setIsImportingPdf] = useState(false);
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [libraryModules, setLibraryModules] = useState([]);
-  const [isLibraryLoading, setIsLibraryLoading] = useState(false);
-  const [isLibraryUploading, setIsLibraryUploading] = useState(false);
+  const [publicLibraryModules, setPublicLibraryModules] = useState([]);
+  const [privateLibraryModules, setPrivateLibraryModules] = useState([]);
+  const [isPublicLibraryLoading, setIsPublicLibraryLoading] = useState(false);
+  const [isPrivateLibraryLoading, setIsPrivateLibraryLoading] = useState(false);
+  const [isPublicLibraryUploading, setIsPublicLibraryUploading] = useState(false);
+  const [isPrivateLibraryUploading, setIsPrivateLibraryUploading] = useState(false);
   const [pendingImportModule, setPendingImportModule] = useState(null);
   const htmlModuleInputRef = useRef(null);
   const pdfInputRef = useRef(null);
+  const publicLibraryInputRef = useRef(null);
+  const privateLibraryInputRef = useRef(null);
   const importMenuRef = useRef(null);
-  const libraryInputRef = useRef(null);
 
   const hasWorkspace = state.workspace.length > 0;
   const hasSection = state.workspace.some((item) => item.type === 'section');
@@ -133,7 +152,7 @@ function App() {
   }, [isAuthenticated, isAuthLoading, pathname]);
 
   const loadPublicModules = async () => {
-    setIsLibraryLoading(true);
+    setIsPublicLibraryLoading(true);
 
     try {
       const { data, error } = await supabase
@@ -146,19 +165,52 @@ function App() {
         throw error;
       }
 
-      setLibraryModules(Array.isArray(data) ? data : []);
+      setPublicLibraryModules(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Erro ao carregar biblioteca publica:', error);
-      setLibraryModules([]);
+      setPublicLibraryModules([]);
     } finally {
-      setIsLibraryLoading(false);
+      setIsPublicLibraryLoading(false);
+    }
+  };
+
+  const loadPrivateModules = async () => {
+    if (!user?.id) return;
+
+    setIsPrivateLibraryLoading(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('modules')
+        .select('*')
+        .eq('is_public', false)
+        .eq('user_id', user.id)
+        .order('id', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      setPrivateLibraryModules(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Erro ao carregar biblioteca privada:', error);
+      setPrivateLibraryModules([]);
+    } finally {
+      setIsPrivateLibraryLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!isAuthenticated || activeView !== 'library') return;
-    loadPublicModules();
-  }, [activeView, isAuthenticated]);
+    if (!isAuthenticated) return;
+
+    if (activeView === 'library-public') {
+      loadPublicModules();
+    }
+
+    if (activeView === 'library-private') {
+      loadPrivateModules();
+    }
+  }, [activeView, isAuthenticated, user?.id]);
 
   const updateCurrentTab = (payload) => {
     if (!selectedSection || !activeTab) return;
@@ -169,13 +221,10 @@ function App() {
     const file = event.target.files?.[0];
     if (!file || !activeTab) return;
 
-    setIsImportingWorkspaceFile(true);
-
     try {
       const content = await file.text();
-      updateCurrentTab({ type: detectTabType(content), content, fileUrl: null });
+      updateCurrentTab({ type: detectTabType(content), content, fileUrl: null, status: 'novo' });
     } finally {
-      setIsImportingWorkspaceFile(false);
       setIsImportMenuOpen(false);
       event.target.value = '';
     }
@@ -185,14 +234,46 @@ function App() {
     const file = event.target.files?.[0];
     if (!file || !activeTab) return;
 
-    setIsImportingPdf(true);
-
     try {
       const fileUrl = await readFileAsDataUrl(file);
-      updateCurrentTab({ type: 'pdf', content: '', fileUrl, noteZoom: 1 });
+      updateCurrentTab({ type: 'pdf', content: '', fileUrl, noteZoom: 1, status: 'novo' });
     } finally {
-      setIsImportingPdf(false);
       setIsImportMenuOpen(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleImportComputerFileToPrivateLibrary = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !user?.id) return;
+
+    setIsPrivateLibraryUploading(true);
+
+    try {
+      const fileName = file.name;
+      const isPdf = isPdfFile(file);
+      const content = isPdf ? await readFileAsDataUrl(file) : await file.text();
+      const moduleType = isPdf ? 'pdf' : detectTabType(content);
+
+      const { error } = await supabase.from('modules').insert([
+        {
+          title: fileName,
+          content,
+          module_type: moduleType,
+          status: 'novo',
+          is_public: false,
+          user_id: user.id,
+        },
+      ]);
+
+      if (error) throw error;
+
+      await loadPrivateModules();
+    } catch (error) {
+      console.error('Erro ao enviar arquivo para biblioteca privada:', error);
+      window.alert('Nao foi possivel salvar o arquivo na biblioteca privada.');
+    } finally {
+      setIsPrivateLibraryUploading(false);
       event.target.value = '';
     }
   };
@@ -215,11 +296,11 @@ function App() {
     }
   };
 
-  const handleLibraryUpload = async (event) => {
+  const handlePublicLibraryUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setIsLibraryUploading(true);
+    setIsPublicLibraryUploading(true);
 
     try {
       const fileName = sanitizeFileName(file.name);
@@ -239,7 +320,10 @@ function App() {
         {
           title: file.name,
           file_url: publicUrl,
+          module_type: isPdfFile(file) ? 'pdf' : detectTabType(await file.text()),
+          status: 'publicado',
           is_public: true,
+          user_id: user?.id ?? null,
         },
       ]);
 
@@ -250,7 +334,7 @@ function App() {
       console.error('Erro ao enviar modulo publico:', error);
       window.alert('Nao foi possivel enviar o modulo para a biblioteca publica.');
     } finally {
-      setIsLibraryUploading(false);
+      setIsPublicLibraryUploading(false);
       event.target.value = '';
     }
   };
@@ -283,15 +367,48 @@ function App() {
     await loadPublicModules();
   };
 
+  const handleDeletePrivateModule = async (module) => {
+    const confirmed = window.confirm('Deseja excluir o arquivo da biblioteca privada?');
+    if (!confirmed) return;
+
+    const { error } = await supabase.from('modules').delete().eq('id', module.id).eq('user_id', user.id);
+    if (error) {
+      console.error('Erro ao excluir arquivo da biblioteca privada:', error);
+      window.alert('Nao foi possivel excluir o arquivo da biblioteca privada.');
+      return;
+    }
+
+    await loadPrivateModules();
+  };
+
   const handleImportPublicModule = (module) => {
-    setPendingImportModule(module);
+    setPendingImportModule({ source: 'public', module });
+  };
+
+  const handleImportPrivateModule = (module) => {
+    if (!selectedSection) {
+      window.alert('Selecione uma secao antes de importar um arquivo da biblioteca privada.');
+      return;
+    }
+
+    actions.importPrivateModule(selectedSection.id, module);
+    setActiveView('workspace');
   };
 
   const handleSelectImportSection = async (sectionId) => {
     if (!pendingImportModule) return;
 
     try {
-      const response = await fetch(pendingImportModule.file_url);
+      const { source, module } = pendingImportModule;
+
+      if (source === 'private') {
+        actions.importPrivateModule(sectionId, module);
+        setActiveView('workspace');
+        setPendingImportModule(null);
+        return;
+      }
+
+      const response = await fetch(module.file_url);
       if (!response.ok) {
         throw new Error(`Falha ao carregar modulo publico: ${response.status}`);
       }
@@ -299,7 +416,7 @@ function App() {
       const content = await response.text();
 
       actions.importPublicModule(sectionId, {
-        ...pendingImportModule,
+        ...module,
         content,
       });
       setActiveView('workspace');
@@ -307,6 +424,47 @@ function App() {
     } catch (error) {
       console.error('Erro ao importar modulo publico:', error);
       window.alert('Nao foi possivel importar o modulo para a secao selecionada.');
+    }
+  };
+
+  const handleSaveCurrentTabToPrivateLibrary = async () => {
+    if (!activeTab || !user?.id) return;
+
+    try {
+      let content = activeTab.content ?? '';
+      let moduleType = activeTab.type;
+
+      if (activeTab.type === 'pdf' && activeTab.fileUrl) {
+        content = activeTab.fileUrl;
+      } else if (!content && activeTab.fileUrl) {
+        const response = await fetch(activeTab.fileUrl);
+        if (!response.ok) {
+          throw new Error(`Falha ao carregar o arquivo da aba: ${response.status}`);
+        }
+
+        content = await response.text();
+        if (activeTab.type === 'html' && detectTabType(content) === 'module') {
+          moduleType = 'module';
+        }
+      }
+
+      const { error } = await supabase.from('modules').insert([
+        {
+          title: activeTab.name,
+          content,
+          module_type: moduleType,
+          status: activeTab.status ?? 'novo',
+          is_public: false,
+          user_id: user.id,
+        },
+      ]);
+
+      if (error) throw error;
+
+      await loadPrivateModules();
+    } catch (error) {
+      console.error('Erro ao guardar aba na biblioteca privada:', error);
+      window.alert('Nao foi possivel guardar a aba na biblioteca privada.');
     }
   };
 
@@ -394,6 +552,7 @@ function App() {
           onSelectTab={(tabId) => actions.setActiveTab(selectedSection.id, tabId)}
           onRenameTab={(tabId, name) => actions.renameTab(selectedSection.id, tabId, name)}
           onCloseTab={(tabId) => actions.closeTab(selectedSection.id, tabId)}
+          onDuplicateTab={(tabId) => actions.duplicateTab(selectedSection.id, tabId)}
         />
 
         <div className="min-h-0 flex-1 overflow-hidden p-5">
@@ -406,13 +565,24 @@ function App() {
                     <h3 className="text-lg font-semibold text-white">{activeTab.name}</h3>
                     <span className="rounded-full border border-[#3a404d] bg-[#2a2f3a]/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-[#d4d4d8]">
                       {activeTab.type === 'module'
-                        ? 'Modulo'
+                        ? 'Módulo'
                         : activeTab.type === 'note'
                           ? 'Nota'
                           : activeTab.type === 'pdf'
-                            ? 'PDF'
-                            : 'HTML'}
+                          ? 'PDF'
+                          : 'HTML'}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateCurrentTab({
+                          status: getNextStatus(activeTab.status),
+                        })
+                      }
+                      className="rounded-full border border-[#3a404d] bg-[#20232a]/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-[#d4d4d8] transition duration-200 hover:bg-[#2f3542]"
+                    >
+                      {getStatusLabel(activeTab.status)}
+                    </button>
                   </div>
                   <p className="mt-2 text-sm text-[#a1a1aa]">
                     {[selectedTitle?.title, selectedSection.name].filter(Boolean).join(' / ')}
@@ -436,17 +606,32 @@ function App() {
                   />
                   <button
                     type="button"
+                    onClick={handleSaveCurrentTabToPrivateLibrary}
+                    className="rounded-xl border border-[#3a404d] bg-[#1f3b2d] px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#28503d]"
+                  >
+                    Guardar
+                  </button>
+                  <button
+                    type="button"
                     onClick={() =>
                       updateCurrentTab({
                         type: 'note',
                         content: activeTab?.type === 'note' ? activeTab.content : '',
                         fileUrl: null,
                         noteZoom: activeTab?.type === 'note' ? activeTab.noteZoom ?? 1 : 1,
+                        status: activeTab?.type === 'note' ? activeTab.status ?? 'novo' : 'novo',
                       })
                     }
                     className="rounded-xl border border-[#3a404d] bg-transparent px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#2f3542]"
                   >
                     Nova Nota
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => activeTab && actions.duplicateTab(selectedSection.id, activeTab.id)}
+                    className="rounded-xl border border-[#3a404d] bg-[#20232a] px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#2f3542]"
+                  >
+                    Duplicar
                   </button>
                   <div ref={importMenuRef} className="relative">
                     <button
@@ -454,7 +639,7 @@ function App() {
                       onClick={() => setIsImportMenuOpen((current) => !current)}
                       className="rounded-xl border border-[#3a404d] bg-[#20232a] px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#2f3542]"
                     >
-                      {isImportingWorkspaceFile || isImportingPdf ? 'Importando...' : 'Importar'}
+                      Importar
                     </button>
 
                     {isImportMenuOpen ? (
@@ -474,6 +659,17 @@ function App() {
                         >
                           <span>PDF</span>
                           <span className="text-xs uppercase tracking-[0.2em] text-[#7b818d]">PDF</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsImportMenuOpen(false);
+                            setActiveView('library-private');
+                          }}
+                          className="flex w-full items-center justify-between border-t border-[#2a2f3a] px-4 py-3 text-left text-sm text-white transition duration-200 hover:bg-white/[0.04]"
+                        >
+                          <span>Da biblioteca</span>
+                          <span className="text-xs uppercase tracking-[0.2em] text-[#7b818d]">PRIVATE</span>
                         </button>
                       </div>
                     ) : null}
@@ -520,6 +716,7 @@ function App() {
 
   const renderImportModal = () => {
     if (!pendingImportModule) return null;
+    const module = pendingImportModule.module;
 
     return (
       <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0b0d11]/70 p-6 backdrop-blur-sm">
@@ -527,7 +724,7 @@ function App() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-[#a1a1aa]">Importar modulo</p>
-              <h3 className="mt-2 text-xl font-semibold text-white">{pendingImportModule.title}</h3>
+              <h3 className="mt-2 text-xl font-semibold text-white">{module?.title}</h3>
               <p className="mt-2 text-sm text-[#a1a1aa]">Selecione a secao que vai receber este modulo.</p>
             </div>
 
@@ -570,7 +767,8 @@ function App() {
         <Sidebar
           workspace={state.workspace}
           selectedSectionId={state.selectedSectionId}
-          isLibraryActive={activeView === 'library'}
+          isPublicLibraryActive={activeView === 'library-public'}
+          isPrivateLibraryActive={activeView === 'library-private'}
           isLoggingOut={isLoggingOut}
           onAddTitle={actions.addTitle}
           onAddSection={actions.addSection}
@@ -584,7 +782,8 @@ function App() {
             setActiveView('workspace');
             actions.selectSection(sectionId);
           }}
-          onOpenLibrary={() => setActiveView('library')}
+          onOpenPublicLibrary={() => setActiveView('library-public')}
+          onOpenPrivateLibrary={() => setActiveView('library-private')}
           onLogout={handleLogout}
         />
 
@@ -599,25 +798,44 @@ function App() {
               <div className="flex h-full items-center justify-center text-sm text-[#a1a1aa]">
                 Carregando workspace...
               </div>
-            ) : activeView === 'library' ? (
+            ) : activeView === 'library-public' ? (
               <>
                 <input
-                  ref={libraryInputRef}
+                  ref={publicLibraryInputRef}
                   type="file"
                   accept=".html,text/html"
                   className="hidden"
-                  onChange={handleLibraryUpload}
+                  onChange={handlePublicLibraryUpload}
                 />
                 <PublicLibrary
-                  modules={libraryModules}
-                  isLoading={isLibraryLoading}
-                  isUploading={isLibraryUploading}
-                  onUploadClick={() => libraryInputRef.current?.click()}
+                  modules={publicLibraryModules}
+                  isLoading={isPublicLibraryLoading}
+                  isUploading={isPublicLibraryUploading}
+                  onUploadClick={() => publicLibraryInputRef.current?.click()}
                   onModuleClick={(module) => window.open(module.file_url, '_blank', 'noopener,noreferrer')}
                   onDeleteModule={handleDeletePublicModule}
                   onImportModule={handleImportPublicModule}
                 />
                 {renderImportModal()}
+              </>
+            ) : activeView === 'library-private' ? (
+              <>
+                <input
+                  ref={privateLibraryInputRef}
+                  type="file"
+                  accept=".html,text/html,.pdf,application/pdf"
+                  className="hidden"
+                  onChange={handleImportComputerFileToPrivateLibrary}
+                />
+                <PrivateLibrary
+                  modules={privateLibraryModules}
+                  isLoading={isPrivateLibraryLoading}
+                  isUploading={isPrivateLibraryUploading}
+                  onUploadClick={() => privateLibraryInputRef.current?.click()}
+                  onModuleClick={handleImportPrivateModule}
+                  onDeleteModule={handleDeletePrivateModule}
+                  onImportModule={handleImportPrivateModule}
+                />
               </>
             ) : (
               renderWorkspaceContent()

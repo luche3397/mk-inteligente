@@ -58,20 +58,38 @@ create table if not exists tab_contents (
   updated_at timestamp with time zone default now()
 );
 
+create table if not exists modules (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  title text not null,
+  content text,
+  file_url text,
+  module_type text not null default 'html',
+  status text not null default 'novo',
+  is_public boolean not null default false,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
+);
+
 alter table workspaces enable row level security;
 alter table sections enable row level security;
 alter table tabs enable row level security;
 alter table tab_contents enable row level security;
+alter table modules enable row level security;
 
 drop policy if exists "user owns workspace" on workspaces;
 drop policy if exists "user owns section" on sections;
 drop policy if exists "user owns tab" on tabs;
 drop policy if exists "user owns content" on tab_contents;
+drop policy if exists "user owns module" on modules;
+drop policy if exists "public modules are readable" on modules;
 
 create policy "user owns workspace" on workspaces for all using (auth.uid() = user_id);
 create policy "user owns section" on sections for all using (auth.uid() = user_id);
 create policy "user owns tab" on tabs for all using (auth.uid() = user_id);
 create policy "user owns content" on tab_contents for all using (auth.uid() = user_id);
+create policy "user owns module" on modules for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "public modules are readable" on modules for select using (is_public = true or auth.uid() = user_id);
 `;
 
 const executeSql = async () => {
@@ -92,7 +110,7 @@ const executeSql = async () => {
   }
 
   const verifyResponse = await fetch(
-    `${supabaseUrl}/rest/v1/workspaces?select=id&limit=1`,
+    `${supabaseUrl}/rest/v1/modules?select=id&limit=1`,
     {
       headers: {
         apikey: serviceRoleKey,
@@ -104,10 +122,10 @@ const executeSql = async () => {
   const verifyText = await verifyResponse.text();
 
   if (!verifyResponse.ok) {
-    throw new Error(`Falha ao validar tabela workspaces: ${verifyResponse.status} ${verifyText}`);
+    throw new Error(`Falha ao validar tabela modules: ${verifyResponse.status} ${verifyText}`);
   }
 
-  console.log('Tabela workspaces validada com sucesso.');
+  console.log('Tabela modules validada com sucesso.');
 };
 
 executeSql().catch((error) => {

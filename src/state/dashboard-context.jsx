@@ -100,6 +100,7 @@ const parseTabContent = (value = '') => {
       content: '',
       fileUrl: null,
       noteZoom: 1,
+      status: 'novo',
     };
   }
 
@@ -112,6 +113,13 @@ const parseTabContent = (value = '') => {
         content: typeof parsed.content === 'string' ? parsed.content : '',
         fileUrl: typeof parsed.fileUrl === 'string' ? parsed.fileUrl : null,
         noteZoom: typeof parsed.noteZoom === 'number' ? parsed.noteZoom : 1,
+        status:
+          parsed.status === 'novo' ||
+          parsed.status === 'em revisão' ||
+          parsed.status === 'aprovado' ||
+          parsed.status === 'publicado'
+            ? parsed.status
+            : 'novo',
       };
     }
   } catch {
@@ -123,6 +131,7 @@ const parseTabContent = (value = '') => {
     content: value,
     fileUrl: null,
     noteZoom: 1,
+    status: 'novo',
   };
 };
 
@@ -132,7 +141,17 @@ const serializeTabContent = (tab) =>
     content: typeof tab.content === 'string' ? tab.content : '',
     fileUrl: typeof tab.fileUrl === 'string' ? tab.fileUrl : null,
     noteZoom: typeof tab.noteZoom === 'number' ? tab.noteZoom : 1,
+    status:
+      tab.status === 'novo' ||
+      tab.status === 'em revisão' ||
+      tab.status === 'aprovado' ||
+      tab.status === 'publicado'
+        ? tab.status
+        : 'novo',
   });
+
+const isValidTabStatus = (value) =>
+  value === 'novo' || value === 'em revisão' || value === 'aprovado' || value === 'publicado';
 
 const buildWorkspaceSnapshot = (workspace, userId, hiddenLeadingWorkspaceId) => {
   const workspaces = [];
@@ -313,6 +332,7 @@ export function DashboardProvider({ children }) {
             content: parsedContent.content,
             fileUrl: parsedContent.fileUrl,
             noteZoom: parsedContent.noteZoom,
+            status: parsedContent.status,
           });
           tabMap.set(tab.section_id, sectionTabs);
         });
@@ -637,12 +657,74 @@ export function DashboardProvider({ children }) {
           };
         });
       },
+      duplicateTab(sectionId, tabId) {
+        updateState((current) => {
+          const section = current.workspace.find((item) => item.type === 'section' && item.id === sectionId) ?? null;
+          const originalTab = section?.type === 'section' ? section.tabs.find((tab) => tab.id === tabId) ?? null : null;
+
+          if (!section || !originalTab) {
+            return current;
+          }
+
+          const duplicatedTab = createTab(`${originalTab.name} - Cópia`, {
+            type: originalTab.type,
+            content: originalTab.content,
+            fileUrl: originalTab.fileUrl,
+            noteZoom: originalTab.noteZoom,
+            status: 'novo',
+          });
+
+          return {
+            ...current,
+            workspace: mapWorkspace(current.workspace, sectionId, (entry) =>
+              entry.type === 'section'
+                ? {
+                    ...entry,
+                    tabs: [...entry.tabs, duplicatedTab],
+                  }
+                : entry,
+            ),
+            activeTabIdBySection: {
+              ...current.activeTabIdBySection,
+              [sectionId]: duplicatedTab.id,
+            },
+          };
+        });
+      },
       importPublicModule(sectionId, module) {
         updateState((current) => {
           const tab = createTab(module.title, {
             type: 'module',
             content: module.content ?? '',
             fileUrl: module.file_url,
+            status: 'publicado',
+          });
+
+          return {
+            ...current,
+            selectedSectionId: sectionId,
+            workspace: mapWorkspace(current.workspace, sectionId, (section) =>
+              section.type === 'section' ? { ...section, tabs: [...section.tabs, tab] } : section,
+            ),
+            activeTabIdBySection: {
+              ...current.activeTabIdBySection,
+              [sectionId]: tab.id,
+            },
+          };
+        });
+      },
+      importPrivateModule(sectionId, module) {
+        updateState((current) => {
+          const moduleType =
+            module.module_type === 'module' || module.module_type === 'note' || module.module_type === 'pdf'
+              ? module.module_type
+              : 'html';
+          const tab = createTab(module.title, {
+            type: moduleType,
+            content: typeof module.content === 'string' ? module.content : '',
+            fileUrl: moduleType === 'pdf' ? module.content ?? null : null,
+            noteZoom: 1,
+            status: isValidTabStatus(module.status) ? module.status : 'novo',
           });
 
           return {

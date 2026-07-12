@@ -16,6 +16,7 @@ export const createTab = (name = 'Nova aba', overrides = {}) => ({
   content: '',
   fileUrl: null,
   noteZoom: 1,
+  status: 'novo',
   ...overrides,
 });
 
@@ -59,6 +60,13 @@ const normalizeTab = (tab, index) => {
     content,
     fileUrl: typeof tab.fileUrl === 'string' ? tab.fileUrl : null,
     noteZoom: typeof tab.noteZoom === 'number' ? tab.noteZoom : 1,
+    status:
+      tab.status === 'novo' ||
+      tab.status === 'em revisão' ||
+      tab.status === 'aprovado' ||
+      tab.status === 'publicado'
+        ? tab.status
+        : 'novo',
   };
 };
 

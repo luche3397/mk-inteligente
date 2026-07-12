@@ -1,6 +1,20 @@
 import { InlineEditable } from './inline-editable';
 
-export function TabBar({ tabs, activeTabId, onAddTab, onSelectTab, onRenameTab, onCloseTab }) {
+const getTypeLabel = (type) => {
+  if (type === 'module') return 'Módulo';
+  if (type === 'note') return 'Nota';
+  if (type === 'pdf') return 'PDF';
+  return 'HTML';
+};
+
+const getStatusLabel = (status) => {
+  if (status === 'em revisão') return 'Em revisão';
+  if (status === 'aprovado') return 'Aprovado';
+  if (status === 'publicado') return 'Publicado';
+  return 'Novo';
+};
+
+export function TabBar({ tabs, activeTabId, onAddTab, onSelectTab, onRenameTab, onCloseTab, onDuplicateTab }) {
   return (
     <div className="border-b border-[#2a2f3a] bg-white/[0.02] px-4 py-3">
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
@@ -26,8 +40,23 @@ export function TabBar({ tabs, activeTabId, onAddTab, onSelectTab, onRenameTab, 
               />
 
               <span className="rounded-full border border-[#3a404d] bg-[#20232a]/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d4d4d8]">
-                {tab.type === 'module' ? 'Modulo' : tab.type === 'note' ? 'Nota' : tab.type === 'pdf' ? 'PDF' : 'HTML'}
+                {getTypeLabel(tab.type)}
               </span>
+
+              <span className="rounded-full border border-[#3a404d] bg-[#20232a]/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d4d4d8]">
+                {getStatusLabel(tab.status)}
+              </span>
+
+              {onDuplicateTab ? (
+                <button
+                  type="button"
+                  onClick={() => onDuplicateTab(tab.id)}
+                  className="rounded-md px-1.5 py-1 text-xs text-[#7b818d] transition duration-200 hover:bg-[#2f3542] hover:text-white"
+                  aria-label={`Duplicar ${tab.name}`}
+                >
+                  +
+                </button>
+              ) : null}
 
               <button
                 type="button"

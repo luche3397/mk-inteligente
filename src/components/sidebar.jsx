@@ -4,7 +4,8 @@ import { InlineEditable } from './inline-editable';
 export function Sidebar({
   workspace,
   selectedSectionId,
-  isLibraryActive,
+  isPublicLibraryActive,
+  isPrivateLibraryActive,
   isLoggingOut,
   onAddTitle,
   onAddSection,
@@ -15,7 +16,8 @@ export function Sidebar({
   onDeleteSection,
   onReorderItem,
   onSelectSection,
-  onOpenLibrary,
+  onOpenPublicLibrary,
+  onOpenPrivateLibrary,
   onLogout,
 }) {
   const [draggedItemId, setDraggedItemId] = useState(null);
@@ -184,9 +186,21 @@ export function Sidebar({
       <div className="border-t border-[#2a2f3a] px-3 py-3">
         <button
           type="button"
-          onClick={onOpenLibrary}
+          onClick={onOpenPrivateLibrary}
           className={`w-full rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition duration-200 ${
-            isLibraryActive
+            isPrivateLibraryActive
+              ? 'border-[#454d5c] bg-[#2a2f3a] text-white'
+              : 'border-[#2a2f3a] bg-white/[0.03] text-white hover:border-[#3a404d] hover:bg-white/[0.05]'
+          }`}
+        >
+          Biblioteca Privada
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenPublicLibrary}
+          className={`mt-3 w-full rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition duration-200 ${
+            isPublicLibraryActive
               ? 'border-[#454d5c] bg-[#2a2f3a] text-white'
               : 'border-[#2a2f3a] bg-white/[0.03] text-white hover:border-[#3a404d] hover:bg-white/[0.05]'
           }`}
