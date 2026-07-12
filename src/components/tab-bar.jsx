@@ -1,8 +1,31 @@
 import { InlineEditable } from './inline-editable';
 
+export function TabBar({
+  tabs,
+  activeTabId,
+  onAddTab,
+  onSelectTab,
+  onRenameTab,
+  onCloseTab,
+  onDuplicateTab,
+  onReorderTab,
+}) {
+  const handleDragStart = (event, tabId) => {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', tabId);
+  };
 
+  const handleDrop = (event, targetTabId) => {
+    event.preventDefault();
+    const sourceTabId = event.dataTransfer.getData('text/plain');
 
-export function TabBar({ tabs, activeTabId, onAddTab, onSelectTab, onRenameTab, onCloseTab, onDuplicateTab }) {
+    if (!sourceTabId || sourceTabId === targetTabId) {
+      return;
+    }
+
+    onReorderTab?.(sourceTabId, targetTabId);
+  };
+
   return (
     <div className="border-b border-[#2a2f3a] bg-white/[0.02] px-4 py-3">
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
@@ -12,6 +35,10 @@ export function TabBar({ tabs, activeTabId, onAddTab, onSelectTab, onRenameTab, 
           return (
             <div
               key={tab.id}
+              draggable
+              onDragStart={(event) => handleDragStart(event, tab.id)}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => handleDrop(event, tab.id)}
               className={`group flex min-w-[220px] max-w-[320px] items-center gap-2 rounded-t-[22px] border px-3 py-2 transition duration-200 ${
                 isActive
                   ? 'border-[#3a404d] bg-[#1a1d23] text-white'

@@ -44,6 +44,42 @@ const readFileAsDataUrl = (file) =>
     reader.readAsDataURL(file);
   });
 
+const buildPrivateModuleContent = (tab) =>
+  JSON.stringify({
+    version: 1,
+    source: 'workspace',
+    name: tab.name,
+    type: tab.type,
+    content: tab.content ?? '',
+    fileUrl: tab.fileUrl ?? null,
+    noteZoom: tab.noteZoom ?? 1,
+    status: tab.status ?? 'novo',
+  });
+
+const parsePrivateModuleContent = (content, fallback = {}) => {
+  if (typeof content !== 'string' || !content) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === 'object' && parsed.version === 1 && typeof parsed.type === 'string') {
+      return {
+        name: typeof parsed.name === 'string' ? parsed.name : fallback.name ?? '',
+        type: parsed.type,
+        content: typeof parsed.content === 'string' ? parsed.content : '',
+        fileUrl: typeof parsed.fileUrl === 'string' ? parsed.fileUrl : null,
+        noteZoom: typeof parsed.noteZoom === 'number' ? parsed.noteZoom : 1,
+        status: typeof parsed.status === 'string' ? parsed.status : 'novo',
+      };
+    }
+  } catch {
+    // raw content fallback
+  }
+
+  return fallback;
+};
+
 const isPdfFile = (file) =>
   file?.type === 'application/pdf' || file?.name?.toLowerCase().endsWith('.pdf');
 
@@ -254,11 +290,25 @@ function App() {
       const isPdf = isPdfFile(file);
       const content = isPdf ? await readFileAsDataUrl(file) : await file.text();
       const moduleType = isPdf ? 'pdf' : detectTabType(content);
+      const fileUrl = isPdf ? content : null;
 
       const { error } = await supabase.from('modules').insert([
         {
           title: fileName,
-          content,
+          content:
+            moduleType === 'pdf'
+              ? JSON.stringify({
+                  version: 1,
+                  source: 'computer',
+                  name: fileName,
+                  type: moduleType,
+                  content,
+                  fileUrl,
+                  noteZoom: 1,
+                  status: 'novo',
+                })
+              : content,
+          file_url: fileUrl,
           module_type: moduleType,
           status: 'novo',
           is_public: false,
@@ -391,7 +441,24 @@ function App() {
       return;
     }
 
-    actions.importPrivateModule(selectedSection.id, module);
+    const parsed = parsePrivateModuleContent(module.content, {
+      name: module.title,
+      type: module.module_type ?? 'html',
+      content: module.content ?? '',
+      fileUrl: module.file_url ?? null,
+      noteZoom: 1,
+      status: module.status ?? 'novo',
+    });
+
+    actions.importPrivateModule(selectedSection.id, {
+      ...module,
+      title: parsed.name || module.title,
+      content: parsed.content,
+      file_url: parsed.fileUrl ?? module.file_url ?? null,
+      module_type: parsed.type || module.module_type || 'html',
+      status: parsed.status || module.status || 'novo',
+      noteZoom: parsed.noteZoom ?? 1,
+    });
     setActiveView('workspace');
   };
 
@@ -431,27 +498,15 @@ function App() {
     if (!activeTab || !user?.id) return;
 
     try {
-      let content = activeTab.content ?? '';
-      let moduleType = activeTab.type;
-
-      if (activeTab.type === 'pdf' && activeTab.fileUrl) {
-        content = activeTab.fileUrl;
-      } else if (!content && activeTab.fileUrl) {
-        const response = await fetch(activeTab.fileUrl);
-        if (!response.ok) {
-          throw new Error(`Falha ao carregar o arquivo da aba: ${response.status}`);
-        }
-
-        content = await response.text();
-        if (activeTab.type === 'html' && detectTabType(content) === 'module') {
-          moduleType = 'module';
-        }
-      }
+      const payloadContent = buildPrivateModuleContent(activeTab);
+      const moduleType = activeTab.type;
+      const fileUrl = activeTab.type === 'pdf' ? activeTab.fileUrl ?? null : activeTab.fileUrl ?? null;
 
       const { error } = await supabase.from('modules').insert([
         {
           title: activeTab.name,
-          content,
+          content: payloadContent,
+          file_url: fileUrl,
           module_type: moduleType,
           status: activeTab.status ?? 'novo',
           is_public: false,
@@ -464,7 +519,7 @@ function App() {
       await loadPrivateModules();
     } catch (error) {
       console.error('Erro ao guardar aba na biblioteca privada:', error);
-      window.alert('Nao foi possivel guardar a aba na biblioteca privada.');
+      window.alert(`Nao foi possivel guardar a aba na biblioteca privada.\n\n${error?.message ?? ''}`.trim());
     }
   };
 
@@ -553,6 +608,7 @@ function App() {
           onRenameTab={(tabId, name) => actions.renameTab(selectedSection.id, tabId, name)}
           onCloseTab={(tabId) => actions.closeTab(selectedSection.id, tabId)}
           onDuplicateTab={(tabId) => actions.duplicateTab(selectedSection.id, tabId)}
+          onReorderTab={(tabId, targetTabId) => actions.reorderTab(selectedSection.id, tabId, targetTabId)}
         />
 
         <div className="min-h-0 flex-1 overflow-hidden p-5">

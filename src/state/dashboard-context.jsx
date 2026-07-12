@@ -48,6 +48,24 @@ const reorderItems = (workspace, itemId, targetItemId) => {
   return nextWorkspace;
 };
 
+const reorderTabs = (tabs, tabId, targetTabId) => {
+  if (!tabId || !targetTabId || tabId === targetTabId) {
+    return tabs;
+  }
+
+  const sourceIndex = tabs.findIndex((tab) => tab.id === tabId);
+  const targetIndex = tabs.findIndex((tab) => tab.id === targetTabId);
+
+  if (sourceIndex === -1 || targetIndex === -1) {
+    return tabs;
+  }
+
+  const nextTabs = [...tabs];
+  const [tab] = nextTabs.splice(sourceIndex, 1);
+  nextTabs.splice(targetIndex, 0, tab);
+  return nextTabs;
+};
+
 const insertAfterItem = (workspace, afterItemId, nextItem) => {
   if (!afterItemId) {
     return [...workspace, nextItem];
@@ -634,6 +652,19 @@ export function DashboardProvider({ children }) {
           workspace: reorderItems(current.workspace, itemId, targetItemId),
         }));
       },
+      reorderTab(sectionId, tabId, targetTabId) {
+        updateState((current) => ({
+          ...current,
+          workspace: mapWorkspace(current.workspace, sectionId, (section) =>
+            section.type === 'section'
+              ? {
+                  ...section,
+                  tabs: reorderTabs(section.tabs, tabId, targetTabId),
+                }
+              : section,
+          ),
+        }));
+      },
       selectSection(sectionId) {
         setState((current) =>
           validateState({
@@ -715,16 +746,35 @@ export function DashboardProvider({ children }) {
       },
       importPrivateModule(sectionId, module) {
         updateState((current) => {
-          const moduleType =
+          let content = typeof module.content === 'string' ? module.content : '';
+          let fileUrl = typeof module.file_url === 'string' ? module.file_url : null;
+          let status = isValidTabStatus(module.status) ? module.status : 'novo';
+          let moduleType =
             module.module_type === 'module' || module.module_type === 'note' || module.module_type === 'pdf'
               ? module.module_type
               : 'html';
+
+          if (content) {
+            try {
+              const parsed = JSON.parse(content);
+              if (parsed && typeof parsed === 'object' && parsed.version === 1) {
+                content = typeof parsed.content === 'string' ? parsed.content : '';
+                fileUrl = typeof parsed.fileUrl === 'string' ? parsed.fileUrl : fileUrl;
+                status = isValidTabStatus(parsed.status) ? parsed.status : status;
+                moduleType =
+                  parsed.type === 'module' || parsed.type === 'note' || parsed.type === 'pdf' ? parsed.type : moduleType;
+              }
+            } catch {
+              // raw content fallback
+            }
+          }
+
           const tab = createTab(module.title, {
             type: moduleType,
-            content: typeof module.content === 'string' ? module.content : '',
-            fileUrl: moduleType === 'pdf' ? module.content ?? null : null,
+            content,
+            fileUrl: moduleType === 'pdf' ? fileUrl ?? content ?? null : fileUrl ?? null,
             noteZoom: 1,
-            status: isValidTabStatus(module.status) ? module.status : 'novo',
+            status,
           });
 
           return {
