@@ -58,6 +58,31 @@ create table if not exists tab_contents (
   updated_at timestamp with time zone default now()
 );
 
+alter table workspaces
+  add column if not exists user_id uuid,
+  add column if not exists title text,
+  add column if not exists created_at timestamp with time zone;
+
+alter table sections
+  add column if not exists workspace_id uuid,
+  add column if not exists user_id uuid,
+  add column if not exists title text,
+  add column if not exists position integer,
+  add column if not exists created_at timestamp with time zone;
+
+alter table tabs
+  add column if not exists section_id uuid,
+  add column if not exists user_id uuid,
+  add column if not exists title text,
+  add column if not exists position integer,
+  add column if not exists created_at timestamp with time zone;
+
+alter table tab_contents
+  add column if not exists tab_id uuid,
+  add column if not exists user_id uuid,
+  add column if not exists content text,
+  add column if not exists updated_at timestamp with time zone;
+
 create table if not exists modules (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
@@ -72,15 +97,127 @@ create table if not exists modules (
 );
 
 alter table modules
-  add column if not exists user_id uuid references auth.users(id) on delete cascade,
+  add column if not exists user_id uuid,
   add column if not exists title text,
   add column if not exists content text,
   add column if not exists file_url text,
-  add column if not exists module_type text not null default 'html',
-  add column if not exists status text not null default 'novo',
-  add column if not exists is_public boolean not null default false,
-  add column if not exists created_at timestamp with time zone default now(),
-  add column if not exists updated_at timestamp with time zone default now();
+  add column if not exists module_type text,
+  add column if not exists status text,
+  add column if not exists is_public boolean,
+  add column if not exists created_at timestamp with time zone,
+  add column if not exists updated_at timestamp with time zone;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_name = 'workspaces'
+      and constraint_name = 'workspaces_user_id_fkey'
+  ) then
+    alter table workspaces
+      add constraint workspaces_user_id_fkey
+      foreign key (user_id) references auth.users(id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_name = 'sections'
+      and constraint_name = 'sections_workspace_id_fkey'
+  ) then
+    alter table sections
+      add constraint sections_workspace_id_fkey
+      foreign key (workspace_id) references workspaces(id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_name = 'sections'
+      and constraint_name = 'sections_user_id_fkey'
+  ) then
+    alter table sections
+      add constraint sections_user_id_fkey
+      foreign key (user_id) references auth.users(id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_name = 'tabs'
+      and constraint_name = 'tabs_section_id_fkey'
+  ) then
+    alter table tabs
+      add constraint tabs_section_id_fkey
+      foreign key (section_id) references sections(id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_name = 'tabs'
+      and constraint_name = 'tabs_user_id_fkey'
+  ) then
+    alter table tabs
+      add constraint tabs_user_id_fkey
+      foreign key (user_id) references auth.users(id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_name = 'tab_contents'
+      and constraint_name = 'tab_contents_tab_id_fkey'
+  ) then
+    alter table tab_contents
+      add constraint tab_contents_tab_id_fkey
+      foreign key (tab_id) references tabs(id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_name = 'tab_contents'
+      and constraint_name = 'tab_contents_user_id_fkey'
+  ) then
+    alter table tab_contents
+      add constraint tab_contents_user_id_fkey
+      foreign key (user_id) references auth.users(id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_name = 'modules'
+      and constraint_name = 'modules_user_id_fkey'
+  ) then
+    alter table modules
+      add constraint modules_user_id_fkey
+      foreign key (user_id) references auth.users(id) on delete cascade;
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_name = 'modules'
+      and constraint_name = 'modules_user_id_fkey'
+  ) then
+    alter table modules
+      add constraint modules_user_id_fkey
+      foreign key (user_id) references auth.users(id) on delete cascade;
+  end if;
+end $$;
+
+alter table modules
+  alter column module_type set default 'html',
+  alter column status set default 'novo',
+  alter column is_public set default false,
+  alter column created_at set default now(),
+  alter column updated_at set default now();
 
 alter table workspaces enable row level security;
 alter table sections enable row level security;
