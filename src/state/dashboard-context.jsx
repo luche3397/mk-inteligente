@@ -108,7 +108,7 @@ const parseTabContent = (value = '') => {
 
     if (parsed && typeof parsed === 'object') {
       return {
-        type: parsed.type === 'module' || parsed.type === 'note' ? parsed.type : 'html',
+        type: parsed.type === 'module' || parsed.type === 'note' || parsed.type === 'pdf' ? parsed.type : 'html',
         content: typeof parsed.content === 'string' ? parsed.content : '',
         fileUrl: typeof parsed.fileUrl === 'string' ? parsed.fileUrl : null,
         noteZoom: typeof parsed.noteZoom === 'number' ? parsed.noteZoom : 1,
@@ -128,7 +128,7 @@ const parseTabContent = (value = '') => {
 
 const serializeTabContent = (tab) =>
   JSON.stringify({
-    type: tab.type === 'module' || tab.type === 'note' ? tab.type : 'html',
+    type: tab.type === 'module' || tab.type === 'note' || tab.type === 'pdf' ? tab.type : 'html',
     content: typeof tab.content === 'string' ? tab.content : '',
     fileUrl: typeof tab.fileUrl === 'string' ? tab.fileUrl : null,
     noteZoom: typeof tab.noteZoom === 'number' ? tab.noteZoom : 1,

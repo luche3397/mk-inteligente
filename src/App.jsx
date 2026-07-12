@@ -34,6 +34,14 @@ const getFilePathFromUrl = (url) => {
   return parts[1] ?? '';
 };
 
+const readFileAsDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+
 const getCurrentPath = () => {
   const pathname = window.location.pathname || '/';
   return pathname === '/' ? '/' : pathname.replace(/\/+$/, '');
@@ -45,15 +53,17 @@ function App() {
   const [pathname, setPathname] = useState(getCurrentPath);
   const [activeView, setActiveView] = useState('workspace');
   const [isImportingData, setIsImportingData] = useState(false);
-  const [isImportingHtml, setIsImportingHtml] = useState(false);
-  const [isImportingModule, setIsImportingModule] = useState(false);
+  const [isImportingWorkspaceFile, setIsImportingWorkspaceFile] = useState(false);
+  const [isImportingPdf, setIsImportingPdf] = useState(false);
+  const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [libraryModules, setLibraryModules] = useState([]);
   const [isLibraryLoading, setIsLibraryLoading] = useState(false);
   const [isLibraryUploading, setIsLibraryUploading] = useState(false);
   const [pendingImportModule, setPendingImportModule] = useState(null);
-  const htmlInputRef = useRef(null);
-  const moduleInputRef = useRef(null);
+  const htmlModuleInputRef = useRef(null);
+  const pdfInputRef = useRef(null);
+  const importMenuRef = useRef(null);
   const libraryInputRef = useRef(null);
 
   const hasWorkspace = state.workspace.length > 0;
@@ -80,6 +90,32 @@ function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  useEffect(() => {
+    if (!isImportMenuOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (importMenuRef.current && !importMenuRef.current.contains(event.target)) {
+        setIsImportMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsImportMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isImportMenuOpen]);
 
   useEffect(() => {
     if (isAuthLoading) return;
@@ -129,32 +165,34 @@ function App() {
     actions.updateTabContent(selectedSection.id, activeTab.id, payload);
   };
 
-  const handleImportHtml = async (event) => {
+  const handleImportWorkspaceFile = async (event) => {
     const file = event.target.files?.[0];
     if (!file || !activeTab) return;
 
-    setIsImportingHtml(true);
+    setIsImportingWorkspaceFile(true);
 
     try {
       const content = await file.text();
-      updateCurrentTab({ type: 'html', content });
+      updateCurrentTab({ type: detectTabType(content), content, fileUrl: null });
     } finally {
-      setIsImportingHtml(false);
+      setIsImportingWorkspaceFile(false);
+      setIsImportMenuOpen(false);
       event.target.value = '';
     }
   };
 
-  const handleImportModule = async (event) => {
+  const handleImportPdf = async (event) => {
     const file = event.target.files?.[0];
     if (!file || !activeTab) return;
 
-    setIsImportingModule(true);
+    setIsImportingPdf(true);
 
     try {
-      const content = await file.text();
-      updateCurrentTab({ type: detectTabType(content), content });
+      const fileUrl = await readFileAsDataUrl(file);
+      updateCurrentTab({ type: 'pdf', content: '', fileUrl, noteZoom: 1 });
     } finally {
-      setIsImportingModule(false);
+      setIsImportingPdf(false);
+      setIsImportMenuOpen(false);
       event.target.value = '';
     }
   };
@@ -367,7 +405,13 @@ function App() {
                   <div className="mt-1 flex items-center gap-3">
                     <h3 className="text-lg font-semibold text-white">{activeTab.name}</h3>
                     <span className="rounded-full border border-[#3a404d] bg-[#2a2f3a]/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-[#d4d4d8]">
-                      {activeTab.type === 'module' ? 'Modulo' : activeTab.type === 'note' ? 'Nota' : 'HTML'}
+                      {activeTab.type === 'module'
+                        ? 'Modulo'
+                        : activeTab.type === 'note'
+                          ? 'Nota'
+                          : activeTab.type === 'pdf'
+                            ? 'PDF'
+                            : 'HTML'}
                     </span>
                   </div>
                   <p className="mt-2 text-sm text-[#a1a1aa]">
@@ -377,18 +421,18 @@ function App() {
 
                 <div className="flex flex-wrap items-center gap-3">
                   <input
-                    ref={htmlInputRef}
+                    ref={htmlModuleInputRef}
                     type="file"
                     accept=".html,text/html"
                     className="hidden"
-                    onChange={handleImportHtml}
+                    onChange={handleImportWorkspaceFile}
                   />
                   <input
-                    ref={moduleInputRef}
+                    ref={pdfInputRef}
                     type="file"
-                    accept=".html,text/html"
+                    accept=".pdf,application/pdf"
                     className="hidden"
-                    onChange={handleImportModule}
+                    onChange={handleImportPdf}
                   />
                   <button
                     type="button"
@@ -404,20 +448,36 @@ function App() {
                   >
                     Nova Nota
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => htmlInputRef.current?.click()}
-                    className="rounded-xl border border-[#3a404d] bg-[#20232a] px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#2f3542]"
-                  >
-                    {isImportingHtml ? 'Importando HTML...' : 'Importar HTML'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moduleInputRef.current?.click()}
-                    className="rounded-xl border border-[#3a404d] bg-[#2a2f3a] px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#2f3542]"
-                  >
-                    {isImportingModule ? 'Importando modulo...' : 'Importar Modulo'}
-                  </button>
+                  <div ref={importMenuRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsImportMenuOpen((current) => !current)}
+                      className="rounded-xl border border-[#3a404d] bg-[#20232a] px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#2f3542]"
+                    >
+                      {isImportingWorkspaceFile || isImportingPdf ? 'Importando...' : 'Importar'}
+                    </button>
+
+                    {isImportMenuOpen ? (
+                      <div className="absolute right-0 top-full z-20 mt-3 w-56 overflow-hidden rounded-2xl border border-[#2a2f3a] bg-[#171a20] shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+                        <button
+                          type="button"
+                          onClick={() => htmlModuleInputRef.current?.click()}
+                          className="flex w-full items-center justify-between px-4 py-3 text-left text-sm text-white transition duration-200 hover:bg-white/[0.04]"
+                        >
+                          <span>Html ou Módulo</span>
+                          <span className="text-xs uppercase tracking-[0.2em] text-[#7b818d]">HTML</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => pdfInputRef.current?.click()}
+                          className="flex w-full items-center justify-between border-t border-[#2a2f3a] px-4 py-3 text-left text-sm text-white transition duration-200 hover:bg-white/[0.04]"
+                        >
+                          <span>PDF</span>
+                          <span className="text-xs uppercase tracking-[0.2em] text-[#7b818d]">PDF</span>
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
@@ -429,6 +489,8 @@ function App() {
                     onChange={(content) => updateCurrentTab({ content })}
                     onZoomChange={(noteZoom) => updateCurrentTab({ noteZoom })}
                   />
+                ) : activeTab.type === 'pdf' && activeTab.fileUrl ? (
+                  <HtmlViewer src={activeTab.fileUrl} expandable />
                 ) : activeTab.content || activeTab.fileUrl ? (
                   activeTab.type === 'module' ? (
                     <HtmlViewer
@@ -441,8 +503,7 @@ function App() {
                   )
                 ) : (
                   <div className="flex h-full min-h-[280px] items-center justify-center rounded-[24px] border border-dashed border-[#3a404d] bg-[#0f1115]/70 p-6 text-center text-[#a1a1aa]">
-                    Nenhum conteudo importado nesta aba. Use "Importar HTML" para conteudo estatico ou
-                    "Importar Modulo" para detectar automaticamente modulos inteligentes.
+                    Nenhum conteudo importado nesta aba. Use "Importar" para adicionar HTML, modulo ou PDF.
                   </div>
                 )}
               </div>

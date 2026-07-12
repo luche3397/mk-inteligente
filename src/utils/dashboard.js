@@ -47,7 +47,10 @@ const normalizeTab = (tab, index) => {
 
   const content =
     typeof tab.content === 'string' ? tab.content : typeof tab.htmlContent === 'string' ? tab.htmlContent : '';
-  const type = tab.type === 'module' || tab.type === 'html' || tab.type === 'note' ? tab.type : detectTabType(content);
+  const type =
+    tab.type === 'module' || tab.type === 'html' || tab.type === 'note' || tab.type === 'pdf'
+      ? tab.type
+      : detectTabType(content);
 
   return {
     id: isUuid(tab.id) ? tab.id : createId(),
