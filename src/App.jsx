@@ -490,7 +490,7 @@ function App() {
                     onZoomChange={(noteZoom) => updateCurrentTab({ noteZoom })}
                   />
                 ) : activeTab.type === 'pdf' && activeTab.fileUrl ? (
-                  <HtmlViewer src={activeTab.fileUrl} expandable />
+                  <HtmlViewer src={activeTab.fileUrl} expandable mode="pdf" />
                 ) : activeTab.content || activeTab.fileUrl ? (
                   activeTab.type === 'module' ? (
                     <HtmlViewer

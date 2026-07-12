@@ -39,10 +39,12 @@ const closeExistingOverlay = () => {
   }
 };
 
-const createFrame = ({ htmlContent, src }) => {
+const createFrame = ({ htmlContent, src, type = 'html' }) => {
   const iframeEl = document.createElement('iframe');
-  iframeEl.title = 'HTML Preview';
-  iframeEl.sandbox = 'allow-scripts allow-same-origin allow-forms allow-modals';
+  iframeEl.title = type === 'pdf' ? 'PDF Preview' : 'HTML Preview';
+  if (type !== 'pdf') {
+    iframeEl.sandbox = 'allow-scripts allow-same-origin allow-forms allow-modals';
+  }
   iframeEl.style.width = '100%';
   iframeEl.style.height = '100%';
   iframeEl.style.border = 'none';
@@ -138,6 +140,7 @@ const openExpandOverlay = (descriptor) => {
     descriptor.type === 'text'
       ? createTextContent(descriptor)
       : createFrame({
+          type: descriptor.type,
           htmlContent: descriptor.htmlContent,
           src: descriptor.src,
         });
