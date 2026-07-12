@@ -71,6 +71,17 @@ create table if not exists modules (
   updated_at timestamp with time zone default now()
 );
 
+alter table modules
+  add column if not exists user_id uuid references auth.users(id) on delete cascade,
+  add column if not exists title text,
+  add column if not exists content text,
+  add column if not exists file_url text,
+  add column if not exists module_type text not null default 'html',
+  add column if not exists status text not null default 'novo',
+  add column if not exists is_public boolean not null default false,
+  add column if not exists created_at timestamp with time zone default now(),
+  add column if not exists updated_at timestamp with time zone default now();
+
 alter table workspaces enable row level security;
 alter table sections enable row level security;
 alter table tabs enable row level security;

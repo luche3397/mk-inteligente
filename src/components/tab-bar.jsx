@@ -1,18 +1,6 @@
 import { InlineEditable } from './inline-editable';
 
-const getTypeLabel = (type) => {
-  if (type === 'module') return 'Módulo';
-  if (type === 'note') return 'Nota';
-  if (type === 'pdf') return 'PDF';
-  return 'HTML';
-};
 
-const getStatusLabel = (status) => {
-  if (status === 'em revisão') return 'Em revisão';
-  if (status === 'aprovado') return 'Aprovado';
-  if (status === 'publicado') return 'Publicado';
-  return 'Novo';
-};
 
 export function TabBar({ tabs, activeTabId, onAddTab, onSelectTab, onRenameTab, onCloseTab, onDuplicateTab }) {
   return (
@@ -39,13 +27,8 @@ export function TabBar({ tabs, activeTabId, onAddTab, onSelectTab, onRenameTab, 
                 inputClassName="w-full rounded-lg border border-[#3a404d] bg-[#0f1115] px-2 py-1 text-sm text-white"
               />
 
-              <span className="rounded-full border border-[#3a404d] bg-[#20232a]/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d4d4d8]">
-                {getTypeLabel(tab.type)}
-              </span>
 
-              <span className="rounded-full border border-[#3a404d] bg-[#20232a]/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d4d4d8]">
-                {getStatusLabel(tab.status)}
-              </span>
+
 
               {onDuplicateTab ? (
                 <button
