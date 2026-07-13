@@ -290,7 +290,7 @@ function App() {
       const isPdf = isPdfFile(file);
       const content = isPdf ? await readFileAsDataUrl(file) : await file.text();
       const moduleType = isPdf ? 'pdf' : detectTabType(content);
-      const fileUrl = isPdf ? content : null;
+      const fileUrl = content || 'about:blank';
 
       const { error } = await supabase.from('modules').insert([
         {
@@ -454,7 +454,7 @@ function App() {
       ...module,
       title: parsed.name || module.title,
       content: parsed.content,
-      file_url: parsed.fileUrl ?? module.file_url ?? null,
+      file_url: parsed.fileUrl ?? module.file_url ?? parsed.content ?? 'about:blank',
       module_type: parsed.type || module.module_type || 'html',
       status: parsed.status || module.status || 'novo',
       noteZoom: parsed.noteZoom ?? 1,
@@ -500,7 +500,7 @@ function App() {
     try {
       const payloadContent = buildPrivateModuleContent(activeTab);
       const moduleType = activeTab.type;
-      const fileUrl = activeTab.type === 'pdf' ? activeTab.fileUrl ?? null : activeTab.fileUrl ?? null;
+      const fileUrl = activeTab.fileUrl ?? payloadContent ?? 'about:blank';
 
       const { error } = await supabase.from('modules').insert([
         {
