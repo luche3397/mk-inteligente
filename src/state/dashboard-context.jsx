@@ -119,6 +119,8 @@ const parseTabContent = (value = '') => {
       fileUrl: null,
       noteZoom: 1,
       status: 'novo',
+      viewMode: 'content',
+      canvasDocument: null,
     };
   }
 
@@ -131,6 +133,8 @@ const parseTabContent = (value = '') => {
         content: typeof parsed.content === 'string' ? parsed.content : '',
         fileUrl: typeof parsed.fileUrl === 'string' ? parsed.fileUrl : null,
         noteZoom: typeof parsed.noteZoom === 'number' ? parsed.noteZoom : 1,
+        viewMode: parsed.viewMode === 'quadro' ? 'quadro' : 'content',
+        canvasDocument: parsed.canvasDocument && typeof parsed.canvasDocument === 'object' ? parsed.canvasDocument : null,
         status:
           parsed.status === 'novo' ||
           parsed.status === 'em revisão' ||
@@ -149,6 +153,8 @@ const parseTabContent = (value = '') => {
     content: value,
     fileUrl: null,
     noteZoom: 1,
+    viewMode: 'content',
+    canvasDocument: null,
     status: 'novo',
   };
 };
@@ -159,6 +165,8 @@ const serializeTabContent = (tab) =>
     content: typeof tab.content === 'string' ? tab.content : '',
     fileUrl: typeof tab.fileUrl === 'string' ? tab.fileUrl : null,
     noteZoom: typeof tab.noteZoom === 'number' ? tab.noteZoom : 1,
+    viewMode: tab.viewMode === 'quadro' ? 'quadro' : 'content',
+    canvasDocument: tab.canvasDocument && typeof tab.canvasDocument === 'object' ? tab.canvasDocument : null,
     status:
       tab.status === 'novo' ||
       tab.status === 'em revisão' ||
@@ -350,6 +358,8 @@ export function DashboardProvider({ children }) {
             content: parsedContent.content,
             fileUrl: parsedContent.fileUrl,
             noteZoom: parsedContent.noteZoom,
+            viewMode: parsedContent.viewMode,
+            canvasDocument: parsedContent.canvasDocument,
             status: parsedContent.status,
           });
           tabMap.set(tab.section_id, sectionTabs);
@@ -702,6 +712,8 @@ export function DashboardProvider({ children }) {
             content: originalTab.content,
             fileUrl: originalTab.fileUrl,
             noteZoom: originalTab.noteZoom,
+            viewMode: originalTab.viewMode ?? 'content',
+            canvasDocument: originalTab.canvasDocument ?? null,
             status: 'novo',
           });
 
@@ -749,6 +761,8 @@ export function DashboardProvider({ children }) {
           let content = typeof module.content === 'string' ? module.content : '';
           let fileUrl = typeof module.file_url === 'string' ? module.file_url : null;
           let status = isValidTabStatus(module.status) ? module.status : 'novo';
+          let viewMode = module.viewMode === 'quadro' ? 'quadro' : 'content';
+          let canvasDocument = module.canvasDocument && typeof module.canvasDocument === 'object' ? module.canvasDocument : null;
           let moduleType =
             module.module_type === 'module' || module.module_type === 'note' || module.module_type === 'pdf'
               ? module.module_type
@@ -761,6 +775,11 @@ export function DashboardProvider({ children }) {
                 content = typeof parsed.content === 'string' ? parsed.content : '';
                 fileUrl = typeof parsed.fileUrl === 'string' ? parsed.fileUrl : fileUrl;
                 status = isValidTabStatus(parsed.status) ? parsed.status : status;
+                viewMode = parsed.viewMode === 'quadro' ? 'quadro' : viewMode;
+                canvasDocument =
+                  parsed.canvasDocument && typeof parsed.canvasDocument === 'object'
+                    ? parsed.canvasDocument
+                    : canvasDocument;
                 moduleType =
                   parsed.type === 'module' || parsed.type === 'note' || parsed.type === 'pdf' ? parsed.type : moduleType;
               }
@@ -774,6 +793,8 @@ export function DashboardProvider({ children }) {
             content,
             fileUrl: moduleType === 'pdf' ? fileUrl ?? content ?? null : fileUrl ?? null,
             noteZoom: 1,
+            viewMode,
+            canvasDocument,
             status,
           });
 

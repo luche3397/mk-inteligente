@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CadastroPage, LoginPage } from './components/auth-page';
 import { HtmlViewer } from './components/html-viewer';
+import { QuadroCanvas } from './components/quadro-canvas';
 import { PrivateLibrary } from './components/private-library';
 import { NoteEditor } from './components/note-editor';
 import { PublicLibrary } from './components/public-library';
@@ -53,6 +54,8 @@ const buildPrivateModuleContent = (tab) =>
     content: tab.content ?? '',
     fileUrl: tab.fileUrl ?? null,
     noteZoom: tab.noteZoom ?? 1,
+    viewMode: tab.viewMode === 'quadro' ? 'quadro' : 'content',
+    canvasDocument: tab.canvasDocument && typeof tab.canvasDocument === 'object' ? tab.canvasDocument : null,
     status: tab.status ?? 'novo',
   });
 
@@ -70,6 +73,8 @@ const parsePrivateModuleContent = (content, fallback = {}) => {
         content: typeof parsed.content === 'string' ? parsed.content : '',
         fileUrl: typeof parsed.fileUrl === 'string' ? parsed.fileUrl : null,
         noteZoom: typeof parsed.noteZoom === 'number' ? parsed.noteZoom : 1,
+        viewMode: parsed.viewMode === 'quadro' ? 'quadro' : 'content',
+        canvasDocument: parsed.canvasDocument && typeof parsed.canvasDocument === 'object' ? parsed.canvasDocument : null,
         status: typeof parsed.status === 'string' ? parsed.status : 'novo',
       };
     }
@@ -99,6 +104,17 @@ const getCurrentPath = () => {
   const pathname = window.location.pathname || '/';
   return pathname === '/' ? '/' : pathname.replace(/\/+$/, '');
 };
+
+const createDefaultCanvasDocument = () => ({
+  version: 1,
+  viewport: {
+    x: 0,
+    y: 0,
+    zoom: 1,
+  },
+  nodes: [],
+  edges: [],
+});
 
 function App() {
   const { state, selectedTitle, selectedSection, activeTab, isLoadingWorkspace, syncError, actions } = useDashboard();
@@ -447,6 +463,8 @@ function App() {
       content: module.content ?? '',
       fileUrl: module.file_url ?? null,
       noteZoom: 1,
+      viewMode: module.viewMode === 'quadro' ? 'quadro' : 'content',
+      canvasDocument: module.canvasDocument && typeof module.canvasDocument === 'object' ? module.canvasDocument : null,
       status: module.status ?? 'novo',
     });
 
@@ -458,6 +476,8 @@ function App() {
       module_type: parsed.type || module.module_type || 'html',
       status: parsed.status || module.status || 'novo',
       noteZoom: parsed.noteZoom ?? 1,
+      viewMode: parsed.viewMode ?? module.viewMode ?? 'content',
+      canvasDocument: parsed.canvasDocument ?? module.canvasDocument ?? null,
     });
     setActiveView('workspace');
   };
@@ -521,6 +541,46 @@ function App() {
       console.error('Erro ao guardar aba na biblioteca privada:', error);
       window.alert(`Nao foi possivel guardar a aba na biblioteca privada.\n\n${error?.message ?? ''}`.trim());
     }
+  };
+
+  const handleToggleQuadro = () => {
+    if (!activeTab) return;
+
+    const nextViewMode = activeTab.viewMode === 'quadro' ? 'content' : 'quadro';
+    updateCurrentTab({
+      viewMode: nextViewMode,
+      canvasDocument: activeTab.canvasDocument ?? createDefaultCanvasDocument(),
+    });
+  };
+
+  const handleQuadroDocumentChange = (canvasDocument) => {
+    updateCurrentTab({
+      canvasDocument,
+      viewMode: 'quadro',
+    });
+  };
+
+  const handleUploadQuadroImage = async (file) => {
+    if (!user?.id) {
+      throw new Error('Usuário não autenticado.');
+    }
+
+    const safeName = sanitizeFileName(file.name || 'imagem.png');
+    const path = `${user.id}/quadro/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
+    const { error } = await supabase.storage.from('modules').upload(path, file, {
+      cacheControl: '3600',
+      contentType: file.type,
+      upsert: false,
+    });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage.from('modules').getPublicUrl(path);
+    if (!data?.publicUrl) {
+      throw new Error('Não foi possível gerar o endereço da imagem.');
+    }
+
+    return { url: data.publicUrl, path };
   };
 
   const handleLogout = async () => {
@@ -669,6 +729,17 @@ function App() {
                   </button>
                   <button
                     type="button"
+                    onClick={handleToggleQuadro}
+                    className={`rounded-xl border px-4 py-2 text-sm font-medium text-white transition duration-200 ${
+                      activeTab.viewMode === 'quadro'
+                        ? 'border-[#7c83ff] bg-[#3a3f6b] hover:bg-[#4a4f7a]'
+                        : 'border-[#3a404d] bg-[#20232a] hover:bg-[#2f3542]'
+                    }`}
+                  >
+                    Quadro
+                  </button>
+                  <button
+                    type="button"
                     onClick={() =>
                       updateCurrentTab({
                         type: 'note',
@@ -734,7 +805,14 @@ function App() {
               </div>
 
               <div className="min-h-0 flex-1 overflow-auto p-5">
-                {activeTab.type === 'note' ? (
+                {activeTab.viewMode === 'quadro' ? (
+                  <QuadroCanvas
+                    documentValue={activeTab.canvasDocument ?? createDefaultCanvasDocument()}
+                    onChange={handleQuadroDocumentChange}
+                    onExit={handleToggleQuadro}
+                    onUploadImage={handleUploadQuadroImage}
+                  />
+                ) : activeTab.type === 'note' ? (
                   <NoteEditor
                     value={activeTab.content}
                     zoom={activeTab.noteZoom ?? 1}

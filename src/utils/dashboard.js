@@ -17,6 +17,8 @@ export const createTab = (name = 'Nova aba', overrides = {}) => ({
   fileUrl: null,
   noteZoom: 1,
   status: 'novo',
+  viewMode: 'content',
+  canvasDocument: null,
   ...overrides,
 });
 
@@ -60,6 +62,8 @@ const normalizeTab = (tab, index) => {
     content,
     fileUrl: typeof tab.fileUrl === 'string' ? tab.fileUrl : null,
     noteZoom: typeof tab.noteZoom === 'number' ? tab.noteZoom : 1,
+    viewMode: tab.viewMode === 'quadro' ? 'quadro' : 'content',
+    canvasDocument: tab.canvasDocument && typeof tab.canvasDocument === 'object' ? tab.canvasDocument : null,
     status:
       tab.status === 'novo' ||
       tab.status === 'em revisão' ||
