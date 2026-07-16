@@ -105,7 +105,7 @@ const ConnectionHandles = ({ nodeId }) => (
   </>
 );
 
-function CanvasNode({ node, selected, editing, lowDetail, onEdit, onTextChange, onTextCommit, onOpenImage }) {
+function CanvasNode({ node, selected, connectionTarget, editing, lowDetail, onEdit, onTextChange, onTextCommit, onOpenImage }) {
   const colorStyle = node.color
     ? { borderColor: node.color, backgroundColor: `${node.color}18` }
     : undefined;
@@ -114,9 +114,9 @@ function CanvasNode({ node, selected, editing, lowDetail, onEdit, onTextChange, 
     <div
       data-node-id={node.id}
       data-node-type={node.type}
-      className={`absolute select-none rounded-2xl border shadow-[0_14px_34px_rgba(0,0,0,0.28)] ${
+      className={`absolute cursor-grab select-none rounded-2xl border shadow-[0_14px_34px_rgba(0,0,0,0.28)] active:cursor-grabbing ${
         node.type === 'group' ? 'bg-[#15182180]' : 'bg-[#191c23]'
-      } ${selected ? 'border-[#8b91ff] ring-1 ring-[#8b91ff]' : 'border-[#343946]'}`}
+      } ${selected ? 'border-[#8b91ff] ring-1 ring-[#8b91ff]' : connectionTarget ? 'border-[#65d8c5] ring-2 ring-[#65d8c580]' : 'border-[#343946]'}`}
       style={{ left: node.x, top: node.y, width: node.width, height: node.height, zIndex: node.zIndex, ...colorStyle }}
       onDoubleClick={(event) => {
         event.stopPropagation();
@@ -178,7 +178,7 @@ function CanvasNode({ node, selected, editing, lowDetail, onEdit, onTextChange, 
       ) : null}
 
       {selected ? <ResizeHandles /> : null}
-      {selected ? <ConnectionHandles nodeId={node.id} /> : null}
+      {selected || connectionTarget ? <ConnectionHandles nodeId={node.id} /> : null}
     </div>
   );
 }
@@ -485,6 +485,31 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
       startNodes: new Map(documentRef.current.nodes.filter((item) => movingIds.includes(item.id)).map((item) => [item.id, item])),
       constrain: event.shiftKey,
     };
+    setInteractionVisual({ type: 'dragging-nodes' });
+  };
+
+  const findConnectionTarget = (point, sourceNodeId) => {
+    const threshold = 44 / documentRef.current.viewport.zoom;
+    let bestTarget = null;
+
+    for (const node of documentRef.current.nodes) {
+      if (node.id === sourceNodeId) continue;
+      const anchors = SIDES.map((side) => ({ side, ...getNodeAnchor(node, side) }));
+      const closest = anchors
+        .map((anchor) => ({ ...anchor, distance: Math.hypot(point.x - anchor.x, point.y - anchor.y) }))
+        .sort((left, right) => left.distance - right.distance)[0];
+      const insideExpandedBounds =
+        point.x >= node.x - threshold &&
+        point.x <= node.x + node.width + threshold &&
+        point.y >= node.y - threshold &&
+        point.y <= node.y + node.height + threshold;
+
+      if (insideExpandedBounds && (!bestTarget || closest.distance < bestTarget.distance)) {
+        bestTarget = { nodeId: node.id, side: closest.side, distance: closest.distance };
+      }
+    }
+
+    return bestTarget;
   };
 
   const handlePointerDown = (event) => {
@@ -496,28 +521,33 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
 
     if (connectionSide && node) {
       event.preventDefault(); event.stopPropagation();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
       interactionRef.current = { type: 'connecting', fromNode: node.id, fromSide: connectionSide, point: getNodeAnchor(node, connectionSide) };
       setInteractionVisual(interactionRef.current);
       return;
     }
     if (handle && node) {
       event.preventDefault(); event.stopPropagation();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
       setSelection({ nodeIds: [node.id], edgeId: null });
       interactionRef.current = { type: 'resizing-node', nodeId: node.id, handle, startClient: { x: event.clientX, y: event.clientY }, startNode: node, startDocument: documentRef.current };
       return;
     }
     if (node) {
       event.stopPropagation();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
       beginNodeMove(event, node);
       return;
     }
-    if ((spacePressed && event.button === 0) || event.button === 1) {
+    if (event.button === 1 || (event.button === 0 && !event.shiftKey && !event.ctrlKey && !event.metaKey)) {
       event.preventDefault();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
       interactionRef.current = { type: 'panning', startClient: { x: event.clientX, y: event.clientY }, startViewport: documentRef.current.viewport };
       setInteractionVisual({ type: 'panning' });
       return;
     }
     if (event.button === 0) {
+      event.currentTarget.setPointerCapture?.(event.pointerId);
       const point = screenPointToWorld(event.clientX, event.clientY);
       interactionRef.current = { type: 'selecting', start: point, current: point, additive: event.shiftKey || event.ctrlKey || event.metaKey, initialIds: selection.nodeIds };
       if (!interactionRef.current.additive) setSelection({ nodeIds: [], edgeId: null });
@@ -545,6 +575,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
     }
     if (interaction.type === 'connecting') {
       interaction.point = pointerWorldRef.current;
+      interaction.target = findConnectionTarget(pointerWorldRef.current, interaction.fromNode);
       setInteractionVisual({ ...interaction });
       return;
     }
@@ -586,11 +617,11 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
     if (interaction.type === 'idle') return;
     if (interaction.type === 'connecting') {
       const point = screenPointToWorld(event.clientX, event.clientY);
-      const targetElement = document.elementFromPoint(event.clientX, event.clientY)?.closest?.('[data-node-id]');
-      const targetNode = targetElement ? documentRef.current.nodes.find((node) => node.id === targetElement.dataset.nodeId) : null;
+      const magneticTarget = interaction.target || findConnectionTarget(point, interaction.fromNode);
+      const targetNode = magneticTarget ? documentRef.current.nodes.find((node) => node.id === magneticTarget.nodeId) : null;
       if (targetNode && targetNode.id !== interaction.fromNode) {
         const previous = documentRef.current;
-        const edge = { id: createCanvasId(), fromNode: interaction.fromNode, toNode: targetNode.id, fromSide: interaction.fromSide, toSide: nearestSide(targetNode, point), fromEnd: 'none', toEnd: 'arrow', label: '', zIndex: 0 };
+        const edge = { id: createCanvasId(), fromNode: interaction.fromNode, toNode: targetNode.id, fromSide: interaction.fromSide, toSide: magneticTarget?.side || nearestSide(targetNode, point), fromEnd: 'none', toEnd: 'arrow', label: '', zIndex: 0 };
         commit({ ...previous, edges: [...previous.edges, edge] }, previous);
         setSelection({ nodeIds: [], edgeId: edge.id });
       } else {
@@ -607,16 +638,15 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
     } else if (interaction.type === 'panning') onChange?.(documentRef.current);
     interactionRef.current = { type: 'idle' };
     setInteractionVisual(null);
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
   };
 
   const handleWheel = (event) => {
     event.preventDefault();
     const viewport = documentRef.current.viewport;
-    if (event.ctrlKey || spacePressed) {
-      zoomAt(viewport.zoom * Math.exp(-event.deltaY * 0.002), event.clientX, event.clientY);
-      return;
-    }
-    setDocument({ ...documentRef.current, viewport: { ...viewport, x: viewport.x - (event.shiftKey ? event.deltaY : event.deltaX) / viewport.zoom, y: viewport.y - (event.shiftKey ? 0 : event.deltaY) / viewport.zoom } }, true);
+    zoomAt(viewport.zoom * Math.exp(-event.deltaY * 0.002), event.clientX, event.clientY);
   };
 
   const moveSelectionBy = useCallback((dx, dy) => {
@@ -682,7 +712,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
       tabIndex={0}
       role="application"
       aria-label="Quadro visual infinito"
-      className={`relative h-full min-h-[420px] w-full overflow-hidden rounded-3xl border border-[#2a2f3a] bg-[#0f1115] outline-none focus-visible:ring-2 focus-visible:ring-[#7c83ff] ${interactionVisual?.type === 'panning' ? 'cursor-grabbing' : spacePressed ? 'cursor-grab' : 'cursor-default'}`}
+      className={`relative h-full min-h-[420px] w-full overflow-hidden rounded-3xl border border-[#2a2f3a] bg-[#0f1115] outline-none focus-visible:ring-2 focus-visible:ring-[#7c83ff] ${interactionVisual?.type === 'panning' || interactionVisual?.type === 'dragging-nodes' ? 'cursor-grabbing' : 'cursor-grab'}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -717,7 +747,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
 
       <div className="absolute left-0 top-0 h-full w-full" style={worldStyle}>
         {documentState.nodes.filter((node) => node.type === 'group').sort((a, b) => a.zIndex - b.zIndex).map((node) => (
-          <CanvasNode key={node.id} node={node} selected={selection.nodeIds.includes(node.id)} editing={editing?.type === 'node' && editing.id === node.id} lowDetail={lowDetail} onEdit={() => { setSelection({ nodeIds: [node.id], edgeId: null }); setEditing({ type: 'node', id: node.id }); }} onTextChange={(id, patch) => setDocument({ ...documentRef.current, nodes: documentRef.current.nodes.map((item) => item.id === id ? { ...item, ...patch, updatedAt: canvasNow() } : item) }, false)} onTextCommit={() => { setEditing(null); onChange?.(documentRef.current); }} onOpenImage={setImagePreview} />
+          <CanvasNode key={node.id} node={node} selected={selection.nodeIds.includes(node.id)} connectionTarget={interactionVisual?.type === 'connecting' && interactionVisual.target?.nodeId === node.id} editing={editing?.type === 'node' && editing.id === node.id} lowDetail={lowDetail} onEdit={() => { setSelection({ nodeIds: [node.id], edgeId: null }); setEditing({ type: 'node', id: node.id }); }} onTextChange={(id, patch) => setDocument({ ...documentRef.current, nodes: documentRef.current.nodes.map((item) => item.id === id ? { ...item, ...patch, updatedAt: canvasNow() } : item) }, false)} onTextCommit={() => { setEditing(null); onChange?.(documentRef.current); }} onOpenImage={setImagePreview} />
         ))}
 
         <svg className="absolute left-0 top-0 overflow-visible" width="1" height="1" aria-label="Conexões do quadro">
@@ -748,7 +778,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
         </svg>
 
         {documentState.nodes.filter((node) => node.type !== 'group').sort((a, b) => a.zIndex - b.zIndex).map((node) => (
-          <CanvasNode key={node.id} node={node} selected={selection.nodeIds.includes(node.id)} editing={editing?.type === 'node' && editing.id === node.id} lowDetail={lowDetail} onEdit={() => { setSelection({ nodeIds: [node.id], edgeId: null }); setEditing({ type: 'node', id: node.id }); }} onTextChange={(id, patch) => setDocument({ ...documentRef.current, nodes: documentRef.current.nodes.map((item) => item.id === id ? { ...item, ...patch, updatedAt: canvasNow() } : item) }, false)} onTextCommit={() => { setEditing(null); onChange?.(documentRef.current); }} onOpenImage={setImagePreview} />
+          <CanvasNode key={node.id} node={node} selected={selection.nodeIds.includes(node.id)} connectionTarget={interactionVisual?.type === 'connecting' && interactionVisual.target?.nodeId === node.id} editing={editing?.type === 'node' && editing.id === node.id} lowDetail={lowDetail} onEdit={() => { setSelection({ nodeIds: [node.id], edgeId: null }); setEditing({ type: 'node', id: node.id }); }} onTextChange={(id, patch) => setDocument({ ...documentRef.current, nodes: documentRef.current.nodes.map((item) => item.id === id ? { ...item, ...patch, updatedAt: canvasNow() } : item) }, false)} onTextCommit={() => { setEditing(null); onChange?.(documentRef.current); }} onOpenImage={setImagePreview} />
         ))}
 
         {interactionVisual?.type === 'selecting' && Math.hypot(interactionVisual.current.x - interactionVisual.start.x, interactionVisual.current.y - interactionVisual.start.y) > 3 ? (
@@ -757,7 +787,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
       </div>
 
       {contextualToolbarPosition && (selection.nodeIds.length || selectedEdge) ? (
-        <div className="absolute z-50 flex -translate-x-1/2 -translate-y-[calc(100%+12px)] items-center gap-1 rounded-xl border border-[#353a47] bg-[#13161deF] p-1.5 shadow-xl backdrop-blur" style={{ left: clamp(contextualToolbarPosition.x, 150, (getRect()?.width || 600) - 150), top: Math.max(54, contextualToolbarPosition.y) }}>
+        <div onPointerDown={(event) => event.stopPropagation()} className="absolute z-50 flex -translate-x-1/2 -translate-y-[calc(100%+12px)] items-center gap-1 rounded-xl border border-[#353a47] bg-[#13161deF] p-1.5 shadow-xl backdrop-blur" style={{ left: clamp(contextualToolbarPosition.x, 150, (getRect()?.width || 600) - 150), top: Math.max(54, contextualToolbarPosition.y) }}>
           {COLORS.map((color) => <button key={color || 'none'} type="button" title={color ? 'Alterar cor' : 'Sem cor'} aria-label={color ? `Cor ${color}` : 'Remover cor'} onClick={() => changeSelectionColor(color)} className="h-6 w-6 rounded-full border border-white/20" style={{ background: color || '#252a34' }} />)}
           {selection.nodeIds.length ? <><FloatingButton title="Duplicar seleção" onClick={() => duplicateSelection()}>Duplicar</FloatingButton><FloatingButton title="Agrupar seleção" onClick={createGroup}>Agrupar</FloatingButton></> : null}
           {selectedEdge ? <FloatingButton title="Editar rótulo" onClick={() => { const label = window.prompt('Rótulo da conexão:', selectedEdge.label || ''); if (label !== null) commit({ ...documentRef.current, edges: documentRef.current.edges.map((edge) => edge.id === selectedEdge.id ? { ...edge, label } : edge) }); }}>Rótulo</FloatingButton> : null}
@@ -765,7 +795,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
         </div>
       ) : null}
 
-      <div className="absolute right-4 top-4 z-50 flex flex-wrap items-center gap-2 rounded-2xl border border-[#2a2f3a] bg-[#11141aeb] p-2 text-white shadow-lg backdrop-blur-xl">
+      <div onPointerDown={(event) => event.stopPropagation()} className="absolute right-4 top-4 z-50 flex flex-wrap items-center gap-2 rounded-2xl border border-[#2a2f3a] bg-[#11141aeb] p-2 text-white shadow-lg backdrop-blur-xl">
         <FloatingButton title="Diminuir zoom" onClick={() => { const rect = getRect(); if (rect) zoomAt(documentState.viewport.zoom - 0.12, rect.left + rect.width / 2, rect.top + rect.height / 2); }}>−</FloatingButton>
         <span className="min-w-14 text-center text-xs font-semibold">{Math.round(documentState.viewport.zoom * 100)}%</span>
         <FloatingButton title="Aumentar zoom" onClick={() => { const rect = getRect(); if (rect) zoomAt(documentState.viewport.zoom + 0.12, rect.left + rect.width / 2, rect.top + rect.height / 2); }}>+</FloatingButton>
@@ -775,7 +805,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-4 z-50 flex justify-center px-4">
-        <div className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-2 rounded-2xl border border-[#2a2f3a] bg-[#11141aeb] p-2 shadow-[0_24px_80px_rgba(0,0,0,.4)] backdrop-blur-xl">
+        <div onPointerDown={(event) => event.stopPropagation()} className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-2 rounded-2xl border border-[#2a2f3a] bg-[#11141aeb] p-2 shadow-[0_24px_80px_rgba(0,0,0,.4)] backdrop-blur-xl">
           <FloatingButton title="Criar cartão de texto" onClick={() => addTextAt(viewportCenter())}>Texto</FloatingButton>
           <FloatingButton title="Inserir imagem" onClick={() => fileInputRef.current?.click()}>Imagem</FloatingButton>
           <FloatingButton title="Criar grupo" onClick={createGroup}>Grupo</FloatingButton>
@@ -789,7 +819,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
       </div>
 
       {contextMenu ? (
-        <div className="fixed z-[100] w-52 overflow-hidden rounded-xl border border-[#343946] bg-[#171a20] py-1 text-sm text-white shadow-2xl" style={{ left: Math.min(contextMenu.x, window.innerWidth - 220), top: Math.min(contextMenu.y, window.innerHeight - 330) }}>
+        <div onPointerDown={(event) => event.stopPropagation()} className="fixed z-[100] w-52 overflow-hidden rounded-xl border border-[#343946] bg-[#171a20] py-1 text-sm text-white shadow-2xl" style={{ left: Math.min(contextMenu.x, window.innerWidth - 220), top: Math.min(contextMenu.y, window.innerHeight - 330) }}>
           {!contextMenu.nodeId && !contextMenu.edgeId ? <><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { addTextAt(contextMenu.point); setContextMenu(null); }}>Adicionar texto</button><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { fileInputRef.current?.click(); setContextMenu(null); }}>Adicionar imagem</button><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { createGroup(); setContextMenu(null); }}>Criar grupo</button><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { setSelection({ nodeIds: documentRef.current.nodes.map((node) => node.id), edgeId: null }); setContextMenu(null); }}>Selecionar tudo</button><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { fitNodes(); setContextMenu(null); }}>Ajustar visualização</button></> : null}
           {contextMenu.nodeId ? <><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { setEditing({ type: 'node', id: contextMenu.nodeId }); setContextMenu(null); }}>Editar</button><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { duplicateSelection(); setContextMenu(null); }}>Duplicar</button><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { void copySelection(false); setContextMenu(null); }}>Copiar</button><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { createGroup(); setContextMenu(null); }}>Criar grupo</button></> : null}
           {contextMenu.edgeId ? <button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { const edge = documentRef.current.edges.find((item) => item.id === contextMenu.edgeId); const label = window.prompt('Rótulo da conexão:', edge?.label || ''); if (label !== null && edge) commit({ ...documentRef.current, edges: documentRef.current.edges.map((item) => item.id === edge.id ? { ...item, label } : item) }); setContextMenu(null); }}>Editar rótulo</button> : null}
