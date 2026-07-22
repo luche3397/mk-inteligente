@@ -543,6 +543,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
     setIsColorPaletteOpen(false);
     const handle = event.target.closest?.('[data-resize-handle]')?.dataset.resizeHandle;
     const connectionSide = event.target.closest?.('[data-connection-handle]')?.dataset.connectionHandle;
+    const edgeElement = event.target.closest?.('[data-edge-id]');
     const nodeElement = event.target.closest?.('[data-node-id]');
     const node = nodeElement ? documentRef.current.nodes.find((item) => item.id === nodeElement.dataset.nodeId) : null;
 
@@ -558,6 +559,13 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
         moved: false,
       };
       setInteractionVisual({ type: 'panning' });
+      return;
+    }
+
+    if (event.button === 0 && edgeElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      setSelection({ nodeIds: [], edgeId: edgeElement.dataset.edgeId });
       return;
     }
 
@@ -766,9 +774,12 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
         }
         const node = event.target.closest?.('[data-node-id]');
         const edge = event.target.closest?.('[data-edge-id]');
+        if (edge) {
+          setContextMenu(null);
+          return;
+        }
         setContextMenu({ x: event.clientX, y: event.clientY, point: screenPointToWorld(event.clientX, event.clientY), nodeId: node?.dataset.nodeId, edgeId: edge?.dataset.edgeId });
         if (node && !selection.nodeIds.includes(node.dataset.nodeId)) setSelection({ nodeIds: [node.dataset.nodeId], edgeId: null });
-        if (edge) setSelection({ nodeIds: [], edgeId: edge.dataset.edgeId });
       }}
       style={{
         backgroundImage: 'radial-gradient(circle, rgba(255,255,255,.11) 1px, transparent 1.2px)',
@@ -799,7 +810,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
             const center = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
             return <g key={edge.id} data-edge-id={edge.id} className="cursor-pointer" onClick={(event) => { event.stopPropagation(); setSelection({ nodeIds: [], edgeId: edge.id }); }} onDoubleClick={(event) => { event.stopPropagation(); const label = window.prompt('Rótulo da conexão:', edge.label || ''); if (label !== null) commit({ ...documentRef.current, edges: documentRef.current.edges.map((item) => item.id === edge.id ? { ...item, label } : item) }); }}>
               <path d={path} fill="none" stroke="transparent" strokeWidth="16" />
-              <path d={path} fill="none" stroke={selection.edgeId === edge.id ? '#ffffff' : color} strokeWidth={selection.edgeId === edge.id ? 3 : 2} markerStart={edge.fromEnd === 'arrow' ? `url(#arrow-${color.replace('#', '')})` : undefined} markerEnd={edge.toEnd === 'arrow' ? `url(#arrow-${color.replace('#', '')})` : undefined} />
+              <path d={path} fill="none" stroke={color} strokeWidth={selection.edgeId === edge.id ? 3 : 2} markerStart={edge.fromEnd === 'arrow' ? `url(#arrow-${color.replace('#', '')})` : undefined} markerEnd={edge.toEnd === 'arrow' ? `url(#arrow-${color.replace('#', '')})` : undefined} style={selection.edgeId === edge.id ? { filter: `drop-shadow(0 0 3px ${color})` } : undefined} />
               {edge.label ? <foreignObject x={center.x - 70} y={center.y - 14} width="140" height="28" className="pointer-events-none"><div className="truncate rounded-lg bg-[#101218e6] px-2 py-1 text-center text-xs text-white">{edge.label}</div></foreignObject> : null}
             </g>;
           })}
@@ -869,8 +880,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
         <div onPointerDown={(event) => event.stopPropagation()} className="fixed z-[100] w-52 overflow-hidden rounded-xl border border-[#343946] bg-[#171a20] py-1 text-sm text-white shadow-2xl" style={{ left: Math.min(contextMenu.x, window.innerWidth - 220), top: Math.min(contextMenu.y, window.innerHeight - 330) }}>
           {!contextMenu.nodeId && !contextMenu.edgeId ? <><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { addTextAt(contextMenu.point); setContextMenu(null); }}>Adicionar texto</button><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { fileInputRef.current?.click(); setContextMenu(null); }}>Adicionar imagem</button><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { createGroup(); setContextMenu(null); }}>Criar grupo</button><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { setSelection({ nodeIds: documentRef.current.nodes.map((node) => node.id), edgeId: null }); setContextMenu(null); }}>Selecionar tudo</button><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { fitNodes(); setContextMenu(null); }}>Ajustar visualização</button></> : null}
           {contextMenu.nodeId ? <><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { setEditing({ type: 'node', id: contextMenu.nodeId }); setContextMenu(null); }}>Editar</button><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { duplicateSelection(); setContextMenu(null); }}>Duplicar</button><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { void copySelection(false); setContextMenu(null); }}>Copiar</button><button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { createGroup(); setContextMenu(null); }}>Criar grupo</button></> : null}
-          {contextMenu.edgeId ? <button className="w-full px-4 py-2 text-left hover:bg-white/5" onClick={() => { const edge = documentRef.current.edges.find((item) => item.id === contextMenu.edgeId); const label = window.prompt('Rótulo da conexão:', edge?.label || ''); if (label !== null && edge) commit({ ...documentRef.current, edges: documentRef.current.edges.map((item) => item.id === edge.id ? { ...item, label } : item) }); setContextMenu(null); }}>Editar rótulo</button> : null}
-          {(contextMenu.nodeId || contextMenu.edgeId) ? <button className="w-full border-t border-[#343946] px-4 py-2 text-left text-[#ff9b9b] hover:bg-white/5" onClick={() => { removeSelection(); setContextMenu(null); }}>Excluir</button> : null}
+          {contextMenu.nodeId ? <button className="w-full border-t border-[#343946] px-4 py-2 text-left text-[#ff9b9b] hover:bg-white/5" onClick={() => { removeSelection(); setContextMenu(null); }}>Excluir</button> : null}
         </div>
       ) : null}
 
