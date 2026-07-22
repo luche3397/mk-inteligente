@@ -107,9 +107,16 @@ const ConnectionHandles = ({ nodeId }) => (
 );
 
 function CanvasNode({ node, selected, hovered, connectionTarget, editing, lowDetail, onEdit, onHoverChange, onTextChange, onTextCommit, onOpenImage }) {
+  const textAreaRef = useRef(null);
   const colorStyle = node.color
     ? { borderColor: node.color, backgroundColor: `${node.color}18` }
     : { borderColor: NEUTRAL_COLOR, backgroundColor: 'transparent', boxShadow: 'none' };
+
+  useEffect(() => {
+    if (!editing || node.type !== 'text' || !textAreaRef.current) return;
+    textAreaRef.current.focus();
+    textAreaRef.current.select();
+  }, [editing, node.id, node.type]);
 
   return (
     <div
@@ -129,6 +136,7 @@ function CanvasNode({ node, selected, hovered, connectionTarget, editing, lowDet
       {node.type === 'text' ? (
         editing ? (
           <textarea
+            ref={textAreaRef}
             autoFocus
             value={node.text ?? ''}
             onChange={(event) => onTextChange(node.id, { text: event.target.value })}
