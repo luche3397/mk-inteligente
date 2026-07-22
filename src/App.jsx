@@ -117,7 +117,17 @@ const createDefaultCanvasDocument = () => ({
 });
 
 function App() {
-  const { state, selectedTitle, selectedSection, activeTab, isLoadingWorkspace, syncError, actions } = useDashboard();
+  const {
+    state,
+    selectedTitle,
+    selectedSection,
+    activeTab,
+    isLoadingWorkspace,
+    syncError,
+    syncStatus,
+    lastSyncedAt,
+    actions,
+  } = useDashboard();
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [pathname, setPathname] = useState(getCurrentPath);
   const [activeView, setActiveView] = useState('workspace');
@@ -975,6 +985,27 @@ function App() {
               renderWorkspaceContent()
             )}
           </section>
+          {syncStatus !== 'idle' && syncStatus !== 'loading' ? (
+            <div
+              className={`pointer-events-none absolute bottom-4 right-5 z-50 rounded-xl border px-3 py-2 text-xs font-medium shadow-lg backdrop-blur-xl ${
+                syncStatus === 'saved'
+                  ? 'border-[#294537] bg-[#14251dcc] text-[#a7e7c3]'
+                  : syncStatus === 'offline' || syncStatus === 'error'
+                    ? 'border-[#674c27] bg-[#2b2114e6] text-[#f3cf94]'
+                    : 'border-[#3a4050] bg-[#171a20e6] text-[#d7d9e1]'
+              }`}
+            >
+              {syncStatus === 'saving'
+                ? 'Salvando...'
+                : syncStatus === 'pending'
+                  ? 'Alteracoes pendentes'
+                  : syncStatus === 'offline'
+                    ? 'Offline - alteracoes protegidas'
+                    : syncStatus === 'error'
+                      ? 'Sincronizacao pendente'
+                      : `Salvo${lastSyncedAt ? ` as ${lastSyncedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}`}
+            </div>
+          ) : null}
         </main>
       </div>
     </div>

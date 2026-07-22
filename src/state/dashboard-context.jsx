@@ -9,6 +9,7 @@ import {
 } from '../utils/dashboard';
 import { useAuth } from './auth-context';
 import { supabase } from '../supabaseClient';
+import { loadWorkspaceCache, saveWorkspaceCache } from '../utils/workspace-cache';
 
 const DashboardContext = createContext(null);
 
@@ -286,13 +287,23 @@ const buildWorkspaceSnapshot = (workspace, userId, hiddenLeadingWorkspaceId) => 
 
 const formatIdsForInFilter = (ids) => `(${ids.join(',')})`;
 
+const RETRY_DELAYS = [2000, 5000, 10000, 30000];
+
 export function DashboardProvider({ children }) {
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [state, setState] = useState(buildInitialState);
   const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(true);
   const [syncError, setSyncError] = useState('');
+  const [syncStatus, setSyncStatus] = useState('loading');
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const stateRef = useRef(state);
   const syncTimerRef = useRef(null);
+  const cacheTimerRef = useRef(null);
+  const retryTimerRef = useRef(null);
+  const pendingPersistRef = useRef(null);
+  const persistInFlightRef = useRef(false);
+  const retryCountRef = useRef(0);
+  const hasLoadedRemoteRef = useRef(false);
   const hiddenLeadingWorkspaceIdRef = useRef(null);
   const remoteIdsRef = useRef({
     workspaces: new Set(),
@@ -304,10 +315,30 @@ export function DashboardProvider({ children }) {
     stateRef.current = state;
   }, [state]);
 
+  const cacheState = (nextState, pendingSync = true, immediate = false) => {
+    if (!user?.id) return;
+
+    if (cacheTimerRef.current) {
+      window.clearTimeout(cacheTimerRef.current);
+      cacheTimerRef.current = null;
+    }
+
+    const save = () => {
+      cacheTimerRef.current = null;
+      void saveWorkspaceCache(user.id, nextState, pendingSync).catch((error) => {
+        console.warn('Nao foi possivel atualizar o cache local do workspace:', error);
+      });
+    };
+
+    if (immediate) save();
+    else cacheTimerRef.current = window.setTimeout(save, 250);
+  };
+
   const loadWorkspace = async () => {
     if (!user?.id) {
       setState(buildInitialState());
       setIsLoadingWorkspace(false);
+      setSyncStatus('idle');
       hiddenLeadingWorkspaceIdRef.current = null;
       remoteIdsRef.current = {
         workspaces: new Set(),
@@ -317,7 +348,26 @@ export function DashboardProvider({ children }) {
       return;
     }
 
-    setIsLoadingWorkspace(true);
+    let cachedWorkspace = null;
+
+    try {
+      cachedWorkspace = await loadWorkspaceCache(user.id);
+      if (cachedWorkspace?.state) {
+        const cachedState = validateState(cachedWorkspace.state);
+        stateRef.current = cachedState;
+        setState(cachedState);
+        setIsLoadingWorkspace(false);
+        setSyncStatus(cachedWorkspace.pendingSync ? 'pending' : 'loading');
+      } else {
+        setIsLoadingWorkspace(true);
+        setSyncStatus('loading');
+      }
+    } catch (error) {
+      console.warn('Nao foi possivel carregar o cache local do workspace:', error);
+      setIsLoadingWorkspace(true);
+      setSyncStatus('loading');
+    }
+
     setSyncError('');
 
     try {
@@ -416,11 +466,30 @@ export function DashboardProvider({ children }) {
         tabs: new Set(tabs.map((item) => item.id)),
       };
 
-      setState(validatedState);
+      hasLoadedRemoteRef.current = true;
+
+      if (cachedWorkspace?.pendingSync && cachedWorkspace.state) {
+        const cachedState = validateState(cachedWorkspace.state);
+        stateRef.current = cachedState;
+        setState(cachedState);
+        setSyncStatus('pending');
+        queuePersist(cachedState, { debounceMs: 0, mode: 'full' });
+      } else {
+        stateRef.current = validatedState;
+        setState(validatedState);
+        setSyncStatus('saved');
+        setLastSyncedAt(new Date());
+        cacheState(validatedState, false, true);
+      }
     } catch (error) {
       console.error('Erro ao carregar workspace do Supabase:', error);
-      setSyncError('Nao foi possivel carregar seus dados do workspace.');
-      setState(buildInitialState());
+      const hasLocalData = Boolean(cachedWorkspace?.state);
+      setSyncStatus(navigator.onLine ? 'error' : 'offline');
+      setSyncError(
+        hasLocalData
+          ? 'Sem conexao com o servidor. Seus dados locais foram mantidos e a sincronizacao sera retomada automaticamente.'
+          : 'Nao foi possivel carregar seus dados do workspace. Verifique sua conexao e tente novamente.',
+      );
     } finally {
       setIsLoadingWorkspace(false);
     }
@@ -431,6 +500,14 @@ export function DashboardProvider({ children }) {
       window.clearTimeout(syncTimerRef.current);
       syncTimerRef.current = null;
     }
+    if (retryTimerRef.current) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    pendingPersistRef.current = null;
+    persistInFlightRef.current = false;
+    retryCountRef.current = 0;
+    hasLoadedRemoteRef.current = false;
 
     if (isAuthLoading) return;
 
@@ -438,6 +515,7 @@ export function DashboardProvider({ children }) {
       setState(buildInitialState());
       setIsLoadingWorkspace(false);
       setSyncError('');
+      setSyncStatus('idle');
       hiddenLeadingWorkspaceIdRef.current = null;
       remoteIdsRef.current = {
         workspaces: new Set(),
@@ -451,13 +529,11 @@ export function DashboardProvider({ children }) {
   }, [isAuthenticated, isAuthLoading, user?.id]);
 
   const persistState = async (nextState) => {
-    if (!user?.id) return;
+    if (!user?.id) return false;
 
     const snapshot = buildWorkspaceSnapshot(nextState.workspace, user.id, hiddenLeadingWorkspaceIdRef.current);
 
     try {
-      setSyncError('');
-
       if (snapshot.workspaces.length) {
         const { error } = await supabase.from('workspaces').upsert(snapshot.workspaces, {
           onConflict: 'id',
@@ -545,14 +621,103 @@ export function DashboardProvider({ children }) {
         sections: new Set(snapshot.sectionIds),
         tabs: new Set(snapshot.tabIds),
       };
+      return true;
     } catch (error) {
       console.error('Erro ao sincronizar workspace com o Supabase:', error);
-      setSyncError('Nao foi possivel salvar suas alteracoes.');
-      await loadWorkspace();
+      return false;
     }
   };
 
-  const queuePersist = (nextState, debounceMs = 0) => {
+  const persistTabContents = async (nextState, tabIds) => {
+    if (!user?.id || !tabIds.size) return true;
+
+    const snapshot = buildWorkspaceSnapshot(nextState.workspace, user.id, hiddenLeadingWorkspaceIdRef.current);
+    const rows = snapshot.tabContents.filter((row) => tabIds.has(row.tab_id));
+    if (!rows.length) return true;
+
+    const { error } = await supabase.from('tab_contents').upsert(rows, { onConflict: 'id' });
+    if (error) {
+      console.error('Erro ao sincronizar conteudo das abas:', error);
+      return false;
+    }
+
+    return true;
+  };
+
+  const mergePendingPersist = (nextState, mode = 'full', tabId = null) => {
+    const current = pendingPersistRef.current;
+    const tabIds = new Set(current?.tabIds ?? []);
+    if (tabId) tabIds.add(tabId);
+
+    pendingPersistRef.current = {
+      state: nextState,
+      mode: current?.mode === 'full' || mode === 'full' ? 'full' : 'tabs',
+      tabIds,
+    };
+  };
+
+  const scheduleRetry = () => {
+    if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+    const delay = RETRY_DELAYS[Math.min(retryCountRef.current, RETRY_DELAYS.length - 1)];
+    retryCountRef.current += 1;
+    retryTimerRef.current = window.setTimeout(() => {
+      retryTimerRef.current = null;
+      void processPersistQueue();
+    }, delay);
+  };
+
+  const processPersistQueue = async () => {
+    if (persistInFlightRef.current || !pendingPersistRef.current || !user?.id) return;
+
+    if (!navigator.onLine) {
+      setSyncStatus('offline');
+      setSyncError('Sem conexao. Suas alteracoes estao salvas neste dispositivo e serao sincronizadas automaticamente.');
+      return;
+    }
+
+    persistInFlightRef.current = true;
+
+    while (pendingPersistRef.current) {
+      const job = pendingPersistRef.current;
+      pendingPersistRef.current = null;
+      setSyncStatus('saving');
+      setSyncError('');
+
+      const success =
+        job.mode === 'full'
+          ? await persistState(job.state)
+          : await persistTabContents(job.state, job.tabIds);
+
+      if (!success) {
+        const newerJob = pendingPersistRef.current;
+        pendingPersistRef.current = {
+          state: newerJob?.state ?? job.state,
+          mode: newerJob?.mode === 'full' || job.mode === 'full' ? 'full' : 'tabs',
+          tabIds: new Set([...(job.tabIds ?? []), ...(newerJob?.tabIds ?? [])]),
+        };
+        setSyncStatus(navigator.onLine ? 'error' : 'offline');
+        setSyncError('Falha temporaria ao sincronizar. Suas alteracoes foram preservadas e tentaremos novamente.');
+        cacheState(pendingPersistRef.current.state, true, true);
+        scheduleRetry();
+        break;
+      }
+
+      retryCountRef.current = 0;
+      setLastSyncedAt(new Date());
+    }
+
+    persistInFlightRef.current = false;
+
+    if (!pendingPersistRef.current) {
+      setSyncStatus('saved');
+      setSyncError('');
+      cacheState(stateRef.current, false, true);
+    }
+  };
+
+  const queuePersist = (nextState, options = {}) => {
+    const { debounceMs = 0, mode = 'full', tabId = null } = options;
+
     if (syncTimerRef.current) {
       window.clearTimeout(syncTimerRef.current);
       syncTimerRef.current = null;
@@ -560,21 +725,65 @@ export function DashboardProvider({ children }) {
 
     if (!user?.id) return;
 
+    mergePendingPersist(nextState, mode, tabId);
+    cacheState(nextState, true);
+    setSyncStatus(navigator.onLine ? 'pending' : 'offline');
+
     if (debounceMs > 0) {
       syncTimerRef.current = window.setTimeout(() => {
         syncTimerRef.current = null;
-        void persistState(stateRef.current);
+        void processPersistQueue();
       }, debounceMs);
       return;
     }
 
-    void persistState(nextState);
+    void processPersistQueue();
   };
+
+  useEffect(() => {
+    const handleOnline = () => {
+      if (pendingPersistRef.current) {
+        setSyncStatus('pending');
+        setSyncError('Conexao restaurada. Sincronizando alteracoes pendentes...');
+        void processPersistQueue();
+      } else {
+        setSyncStatus('saved');
+        setSyncError('');
+      }
+    };
+
+    const handleOffline = () => {
+      setSyncStatus('offline');
+      setSyncError('Sem conexao. Suas alteracoes continuarao salvas neste dispositivo.');
+      cacheState(stateRef.current, Boolean(pendingPersistRef.current), true);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'hidden') return;
+      cacheState(stateRef.current, Boolean(pendingPersistRef.current), true);
+      if (syncTimerRef.current && navigator.onLine) {
+        window.clearTimeout(syncTimerRef.current);
+        syncTimerRef.current = null;
+        void processPersistQueue();
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user?.id]);
 
   const updateState = (updater, options = {}) => {
     setState((current) => {
       const nextState = validateState(updater(current));
-      queuePersist(nextState, options.debounceMs ?? 0);
+      stateRef.current = nextState;
+      queuePersist(nextState, options);
       return nextState;
     });
   };
@@ -875,7 +1084,7 @@ export function DashboardProvider({ children }) {
                 : section,
             ),
           }),
-          { debounceMs: 800 },
+          { debounceMs: 800, mode: 'tabs', tabId },
         );
       },
       importData(payload) {
@@ -907,9 +1116,11 @@ export function DashboardProvider({ children }) {
       activeTab,
       isLoadingWorkspace,
       syncError,
+      syncStatus,
+      lastSyncedAt,
       actions,
     }),
-    [state, selectedTitle, selectedSection, activeTab, isLoadingWorkspace, syncError, actions],
+    [state, selectedTitle, selectedSection, activeTab, isLoadingWorkspace, syncError, syncStatus, lastSyncedAt, actions],
   );
 
   return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;
