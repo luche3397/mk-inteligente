@@ -24,6 +24,7 @@ import {
 } from '../utils/canvas';
 
 const COLORS = [null, '#7c83ff', '#2dd4bf', '#f59e0b', '#f472b6', '#ef4444'];
+const NEUTRAL_COLOR = '#8b8b8b';
 const SIDES = ['top', 'right', 'bottom', 'left'];
 const RESIZE_HANDLES = ['nw', 'ne', 'se', 'sw'];
 const CLIPBOARD_PREFIX = 'workspace-quadro:';
@@ -108,7 +109,7 @@ const ConnectionHandles = ({ nodeId }) => (
 function CanvasNode({ node, selected, hovered, connectionTarget, editing, lowDetail, onEdit, onHoverChange, onTextChange, onTextCommit, onOpenImage }) {
   const colorStyle = node.color
     ? { borderColor: node.color, backgroundColor: `${node.color}18` }
-    : undefined;
+    : { borderColor: NEUTRAL_COLOR, backgroundColor: 'transparent', boxShadow: 'none' };
 
   return (
     <div
@@ -797,7 +798,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
 
         <svg className="absolute left-0 top-0 overflow-visible" width="1" height="1" aria-label="Conexões do quadro">
           <defs>
-            {COLORS.filter(Boolean).concat(['#8b91a7']).map((color) => <marker key={color} id={`arrow-${color.replace('#', '')}`} markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill={color} /></marker>)}
+            {COLORS.filter(Boolean).concat([NEUTRAL_COLOR]).map((color) => <marker key={color} id={`arrow-${color.replace('#', '')}`} markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill={color} /></marker>)}
           </defs>
           {documentState.edges.map((edge) => {
             const from = documentState.nodes.find((node) => node.id === edge.fromNode);
@@ -806,7 +807,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
             const start = getNodeAnchor(from, edge.fromSide);
             const end = getNodeAnchor(to, edge.toSide);
             const path = getBezierPath(start, end, edge.fromSide, edge.toSide);
-            const color = edge.color || '#8b91a7';
+            const color = edge.color || NEUTRAL_COLOR;
             const center = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
             return <g key={edge.id} data-edge-id={edge.id} className="cursor-pointer" onClick={(event) => { event.stopPropagation(); setSelection({ nodeIds: [], edgeId: edge.id }); }} onDoubleClick={(event) => { event.stopPropagation(); const label = window.prompt('Rótulo da conexão:', edge.label || ''); if (label !== null) commit({ ...documentRef.current, edges: documentRef.current.edges.map((item) => item.id === edge.id ? { ...item, label } : item) }); }}>
               <path d={path} fill="none" stroke="transparent" strokeWidth="16" />
@@ -839,7 +840,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
             </ContextIconButton>
             {isColorPaletteOpen ? (
               <div className="absolute left-1/2 top-full mt-2 flex -translate-x-1/2 items-center gap-1.5 rounded-xl border border-[#353a47] bg-[#13161df5] p-2 shadow-xl">
-                {COLORS.map((color) => <button key={color || 'none'} type="button" title={color ? 'Aplicar cor' : 'Remover cor'} aria-label={color ? `Cor ${color}` : 'Sem cor'} onClick={() => changeSelectionColor(color)} className="h-6 w-6 rounded-full border border-white/20 transition hover:scale-110" style={{ background: color || '#252a34' }} />)}
+                {COLORS.map((color) => <button key={color || 'none'} type="button" title={color ? 'Aplicar cor' : 'Remover cor'} aria-label={color ? `Cor ${color}` : 'Sem cor'} onClick={() => changeSelectionColor(color)} className="h-6 w-6 rounded-full border border-white/20 transition hover:scale-110" style={{ background: color || NEUTRAL_COLOR }} />)}
               </div>
             ) : null}
           </div>
