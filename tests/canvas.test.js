@@ -31,6 +31,7 @@ test('calcula limites e seleção por interseção', () => {
   assert.deepEqual(getNodesBounds(nodes), { minX: 10, minY: 20, maxX: 250, maxY: 150 });
   assert.deepEqual(nodesInSelection(nodes, { x: 0, y: 0 }, { x: 120, y: 120 }), ['a']);
   assert.deepEqual(nodesInSelection(nodes, { x: 260, y: 160 }, { x: 190, y: 90 }), ['b']);
+  assert.deepEqual(nodesInSelection(nodes, { x: 110, y: 20 }, { x: 130, y: 40 }), ['a']);
 });
 
 test('duplica nós com IDs novos e preserva conexões internas', () => {

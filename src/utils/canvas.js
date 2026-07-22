@@ -138,10 +138,10 @@ export const fitCanvasBounds = (bounds, width, height) => {
 };
 
 export const rectanglesIntersect = (left, right) =>
-  left.x < right.x + right.width &&
-  left.x + left.width > right.x &&
-  left.y < right.y + right.height &&
-  left.y + left.height > right.y;
+  left.x <= right.x + right.width &&
+  left.x + left.width >= right.x &&
+  left.y <= right.y + right.height &&
+  left.y + left.height >= right.y;
 
 export const nodesInSelection = (nodes, start, end) => {
   const selection = {
