@@ -578,6 +578,16 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
       return;
     }
 
+    if (event.button === 0 && event.detail >= 2 && node?.type === 'text') {
+      event.preventDefault();
+      event.stopPropagation();
+      setSelection({ nodeIds: [node.id], edgeId: null });
+      setEditing({ type: 'node', id: node.id });
+      interactionRef.current = { type: 'idle' };
+      setInteractionVisual(null);
+      return;
+    }
+
     if (connectionSide && node) {
       event.preventDefault(); event.stopPropagation();
       event.currentTarget.setPointerCapture?.(event.pointerId);
