@@ -838,7 +838,6 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
               <ContextIconButton title="Agrupar seleção" onClick={createGroup}><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="3" width="11" height="11" rx="2" /><rect x="10" y="10" width="11" height="11" rx="2" /></svg></ContextIconButton>
             </>
           ) : null}
-          {selectedEdge ? <ContextIconButton title="Editar rótulo" onClick={() => { const label = window.prompt('Rótulo da conexão:', selectedEdge.label || ''); if (label !== null) commit({ ...documentRef.current, edges: documentRef.current.edges.map((edge) => edge.id === selectedEdge.id ? { ...edge, label } : edge) }); }}><span className="text-xs font-bold">T</span></ContextIconButton> : null}
           <ContextIconButton title="Excluir seleção" danger onClick={removeSelection}><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></svg></ContextIconButton>
         </div>
       ) : null}
