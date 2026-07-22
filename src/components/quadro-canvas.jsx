@@ -659,7 +659,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
         const previous = documentRef.current;
         const edge = { id: createCanvasId(), fromNode: interaction.fromNode, toNode: targetNode.id, fromSide: interaction.fromSide, toSide: magneticTarget?.side || nearestSide(targetNode, point), fromEnd: 'none', toEnd: 'arrow', label: '', zIndex: 0 };
         commit({ ...previous, edges: [...previous.edges, edge] }, previous);
-        setSelection({ nodeIds: [], edgeId: edge.id });
+        setSelection({ nodeIds: [], edgeId: null });
       }
     } else if (interaction.type === 'dragging-nodes' || interaction.type === 'resizing-node') {
       commit(documentRef.current, interaction.historyDocument || interaction.startDocument);
