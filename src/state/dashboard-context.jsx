@@ -10,6 +10,7 @@ import {
 import { useAuth } from './auth-context';
 import { supabase } from '../supabaseClient';
 import { loadWorkspaceCache, saveWorkspaceCache } from '../utils/workspace-cache';
+import { buildWorkspaceSnapshot, rowsMatchSnapshot } from '../utils/workspace-snapshot';
 
 const DashboardContext = createContext(null);
 
@@ -104,14 +105,6 @@ const parseWorkspaceTitle = (value, index) => {
   };
 };
 
-const serializeWorkspaceTitle = ({ label, color, position, hidden = false }) =>
-  JSON.stringify({
-    label,
-    color,
-    position,
-    hidden,
-  });
-
 const parseTabContent = (value = '') => {
   if (!value) {
     return {
@@ -160,134 +153,8 @@ const parseTabContent = (value = '') => {
   };
 };
 
-const serializeTabContent = (tab) =>
-  JSON.stringify({
-    type: tab.type === 'module' || tab.type === 'note' || tab.type === 'pdf' ? tab.type : 'html',
-    content: typeof tab.content === 'string' ? tab.content : '',
-    fileUrl: typeof tab.fileUrl === 'string' ? tab.fileUrl : null,
-    noteZoom: typeof tab.noteZoom === 'number' ? tab.noteZoom : 1,
-    viewMode: tab.viewMode === 'quadro' ? 'quadro' : 'content',
-    canvasDocument: tab.canvasDocument && typeof tab.canvasDocument === 'object' ? tab.canvasDocument : null,
-    status:
-      tab.status === 'novo' ||
-      tab.status === 'em revisão' ||
-      tab.status === 'aprovado' ||
-      tab.status === 'publicado'
-        ? tab.status
-        : 'novo',
-  });
-
 const isValidTabStatus = (value) =>
   value === 'novo' || value === 'em revisão' || value === 'aprovado' || value === 'publicado';
-
-const buildWorkspaceSnapshot = (workspace, userId, hiddenLeadingWorkspaceId) => {
-  const workspaces = [];
-  const sections = [];
-  const tabs = [];
-  const tabContents = [];
-  const workspaceIds = [];
-  const sectionIds = [];
-  const tabIds = [];
-  let workspacePosition = 0;
-  let currentWorkspaceId = null;
-  let hiddenWorkspaceUsed = false;
-  const sectionPositionByWorkspace = new Map();
-
-  const ensureHiddenWorkspace = () => {
-    hiddenWorkspaceUsed = true;
-
-    const hiddenWorkspaceId = hiddenLeadingWorkspaceId ?? crypto.randomUUID();
-
-    if (!workspaces.some((workspaceRow) => workspaceRow.id === hiddenWorkspaceId)) {
-      workspaces.push({
-        id: hiddenWorkspaceId,
-        user_id: userId,
-        title: serializeWorkspaceTitle({
-          label: '',
-          color: '#ffffff',
-          position: workspacePosition,
-          hidden: true,
-        }),
-      });
-      workspaceIds.push(hiddenWorkspaceId);
-      workspacePosition += 1;
-    }
-
-    return hiddenWorkspaceId;
-  };
-
-  workspace.forEach((item) => {
-    if (item.type === 'title') {
-      currentWorkspaceId = item.id;
-      sectionPositionByWorkspace.set(currentWorkspaceId, 0);
-
-      workspaces.push({
-        id: item.id,
-        user_id: userId,
-        title: serializeWorkspaceTitle({
-          label: item.title,
-          color: item.color ?? '#ffffff',
-          position: workspacePosition,
-          hidden: false,
-        }),
-      });
-      workspaceIds.push(item.id);
-      workspacePosition += 1;
-      return;
-    }
-
-    if (!currentWorkspaceId) {
-      currentWorkspaceId = ensureHiddenWorkspace();
-      sectionPositionByWorkspace.set(currentWorkspaceId, 0);
-    }
-
-    const sectionPosition = sectionPositionByWorkspace.get(currentWorkspaceId) ?? 0;
-    sectionPositionByWorkspace.set(currentWorkspaceId, sectionPosition + 1);
-
-    sections.push({
-      id: item.id,
-      workspace_id: currentWorkspaceId,
-      user_id: userId,
-      title: item.name,
-      position: sectionPosition,
-    });
-    sectionIds.push(item.id);
-
-    item.tabs.forEach((tab, index) => {
-      tabs.push({
-        id: tab.id,
-        section_id: item.id,
-        user_id: userId,
-        title: tab.name,
-        position: index,
-      });
-      tabIds.push(tab.id);
-
-      tabContents.push({
-        id: tab.id,
-        tab_id: tab.id,
-        user_id: userId,
-        content: serializeTabContent(tab),
-        updated_at: new Date().toISOString(),
-      });
-    });
-  });
-
-  return {
-    workspaces,
-    sections,
-    tabs,
-    tabContents,
-    workspaceIds,
-    sectionIds,
-    tabIds,
-    hiddenLeadingWorkspaceId: hiddenWorkspaceUsed ? currentWorkspaceId : null,
-  };
-};
-
-const formatIdsForInFilter = (ids) => `(${ids.join(',')})`;
-
-const RETRY_DELAYS = [2000, 5000, 10000, 30000];
 
 export function DashboardProvider({ children }) {
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
@@ -296,14 +163,12 @@ export function DashboardProvider({ children }) {
   const [syncError, setSyncError] = useState('');
   const [syncStatus, setSyncStatus] = useState('loading');
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const stateRef = useRef(state);
-  const syncTimerRef = useRef(null);
   const cacheTimerRef = useRef(null);
-  const retryTimerRef = useRef(null);
-  const pendingPersistRef = useRef(null);
   const persistInFlightRef = useRef(false);
-  const retryCountRef = useRef(0);
-  const hasLoadedRemoteRef = useRef(false);
+  const localRevisionRef = useRef(0);
+  const hasUnsavedChangesRef = useRef(false);
   const hiddenLeadingWorkspaceIdRef = useRef(null);
   const remoteIdsRef = useRef({
     workspaces: new Set(),
@@ -339,6 +204,8 @@ export function DashboardProvider({ children }) {
       setState(buildInitialState());
       setIsLoadingWorkspace(false);
       setSyncStatus('idle');
+      setHasUnsavedChanges(false);
+      hasUnsavedChangesRef.current = false;
       hiddenLeadingWorkspaceIdRef.current = null;
       remoteIdsRef.current = {
         workspaces: new Set(),
@@ -348,6 +215,7 @@ export function DashboardProvider({ children }) {
       return;
     }
 
+    const loadRevision = localRevisionRef.current;
     let cachedWorkspace = null;
 
     try {
@@ -358,6 +226,8 @@ export function DashboardProvider({ children }) {
         setState(cachedState);
         setIsLoadingWorkspace(false);
         setSyncStatus(cachedWorkspace.pendingSync ? 'pending' : 'loading');
+        setHasUnsavedChanges(Boolean(cachedWorkspace.pendingSync));
+        hasUnsavedChangesRef.current = Boolean(cachedWorkspace.pendingSync);
       } else {
         setIsLoadingWorkspace(true);
         setSyncStatus('loading');
@@ -466,18 +336,26 @@ export function DashboardProvider({ children }) {
         tabs: new Set(tabs.map((item) => item.id)),
       };
 
-      hasLoadedRemoteRef.current = true;
+      const shouldKeepLocal =
+        Boolean(cachedWorkspace?.pendingSync) ||
+        hasUnsavedChangesRef.current ||
+        localRevisionRef.current !== loadRevision;
 
-      if (cachedWorkspace?.pendingSync && cachedWorkspace.state) {
-        const cachedState = validateState(cachedWorkspace.state);
-        stateRef.current = cachedState;
-        setState(cachedState);
+      if (shouldKeepLocal) {
+        const localState = stateRef.current;
+        stateRef.current = localState;
+        setState(localState);
         setSyncStatus('pending');
-        queuePersist(cachedState, { debounceMs: 0, mode: 'full' });
+        setHasUnsavedChanges(true);
+        hasUnsavedChangesRef.current = true;
+        setSyncError('');
+        cacheState(localState, true, true);
       } else {
         stateRef.current = validatedState;
         setState(validatedState);
         setSyncStatus('saved');
+        setHasUnsavedChanges(false);
+        hasUnsavedChangesRef.current = false;
         setLastSyncedAt(new Date());
         cacheState(validatedState, false, true);
       }
@@ -487,7 +365,7 @@ export function DashboardProvider({ children }) {
       setSyncStatus(navigator.onLine ? 'error' : 'offline');
       setSyncError(
         hasLocalData
-          ? 'Sem conexao com o servidor. Seus dados locais foram mantidos e a sincronizacao sera retomada automaticamente.'
+          ? 'Sem conexao com o servidor. Seus dados locais foram mantidos. Salve as alteracoes quando a conexao voltar.'
           : 'Nao foi possivel carregar seus dados do workspace. Verifique sua conexao e tente novamente.',
       );
     } finally {
@@ -496,18 +374,8 @@ export function DashboardProvider({ children }) {
   };
 
   useEffect(() => {
-    if (syncTimerRef.current) {
-      window.clearTimeout(syncTimerRef.current);
-      syncTimerRef.current = null;
-    }
-    if (retryTimerRef.current) {
-      window.clearTimeout(retryTimerRef.current);
-      retryTimerRef.current = null;
-    }
-    pendingPersistRef.current = null;
     persistInFlightRef.current = false;
-    retryCountRef.current = 0;
-    hasLoadedRemoteRef.current = false;
+    localRevisionRef.current = 0;
 
     if (isAuthLoading) return;
 
@@ -516,6 +384,8 @@ export function DashboardProvider({ children }) {
       setIsLoadingWorkspace(false);
       setSyncError('');
       setSyncStatus('idle');
+      setHasUnsavedChanges(false);
+      hasUnsavedChangesRef.current = false;
       hiddenLeadingWorkspaceIdRef.current = null;
       remoteIdsRef.current = {
         workspaces: new Set(),
@@ -534,6 +404,22 @@ export function DashboardProvider({ children }) {
     const snapshot = buildWorkspaceSnapshot(nextState.workspace, user.id, hiddenLeadingWorkspaceIdRef.current);
 
     try {
+      const [remoteWorkspaces, remoteSections, remoteTabs, remoteContents] = await Promise.all([
+        supabase.from('workspaces').select('id').eq('user_id', user.id),
+        supabase.from('sections').select('id').eq('user_id', user.id),
+        supabase.from('tabs').select('id').eq('user_id', user.id),
+        supabase.from('tab_contents').select('id').eq('user_id', user.id),
+      ]);
+      const remoteResponses = [remoteWorkspaces, remoteSections, remoteTabs, remoteContents];
+      const failedRemoteResponse = remoteResponses.find((response) => response.error);
+      if (failedRemoteResponse?.error) throw failedRemoteResponse.error;
+
+      remoteIdsRef.current = {
+        workspaces: new Set((remoteWorkspaces.data ?? []).map((item) => item.id)),
+        sections: new Set((remoteSections.data ?? []).map((item) => item.id)),
+        tabs: new Set((remoteTabs.data ?? []).map((item) => item.id)),
+      };
+
       if (snapshot.workspaces.length) {
         const { error } = await supabase.from('workspaces').upsert(snapshot.workspaces, {
           onConflict: 'id',
@@ -569,25 +455,25 @@ export function DashboardProvider({ children }) {
         (id) => !snapshot.sectionIds.includes(id),
       );
       const tabIdsToDelete = [...remoteIdsRef.current.tabs].filter((id) => !snapshot.tabIds.includes(id));
+      const contentIdsToDelete = (remoteContents.data ?? [])
+        .map((item) => item.id)
+        .filter((id) => !snapshot.tabIds.includes(id));
 
-      if (tabIdsToDelete.length) {
+      if (contentIdsToDelete.length) {
         const { error } = await supabase
           .from('tab_contents')
           .delete()
           .eq('user_id', user.id)
-          .in('id', tabIdsToDelete);
+          .in('id', contentIdsToDelete);
         if (error) throw error;
+      }
 
+      if (tabIdsToDelete.length) {
         const { error: deleteTabsError } = await supabase
           .from('tabs')
           .delete()
           .eq('user_id', user.id)
           .in('id', tabIdsToDelete);
-        if (deleteTabsError) throw deleteTabsError;
-      } else if (snapshot.tabIds.length === 0 && remoteIdsRef.current.tabs.size > 0) {
-        const { error } = await supabase.from('tab_contents').delete().eq('user_id', user.id);
-        if (error) throw error;
-        const { error: deleteTabsError } = await supabase.from('tabs').delete().eq('user_id', user.id);
         if (deleteTabsError) throw deleteTabsError;
       }
 
@@ -615,6 +501,26 @@ export function DashboardProvider({ children }) {
         if (error) throw error;
       }
 
+      const [savedWorkspaces, savedSections, savedTabs, savedContents] = await Promise.all([
+        supabase.from('workspaces').select('id,title').eq('user_id', user.id),
+        supabase.from('sections').select('id,workspace_id,title,position').eq('user_id', user.id),
+        supabase.from('tabs').select('id,section_id,title,position').eq('user_id', user.id),
+        supabase.from('tab_contents').select('id,tab_id,content').eq('user_id', user.id),
+      ]);
+      const verificationResponses = [savedWorkspaces, savedSections, savedTabs, savedContents];
+      const failedVerification = verificationResponses.find((response) => response.error);
+      if (failedVerification?.error) throw failedVerification.error;
+
+      const isVerified =
+        rowsMatchSnapshot(savedWorkspaces.data ?? [], snapshot.workspaces, ['id', 'title']) &&
+        rowsMatchSnapshot(savedSections.data ?? [], snapshot.sections, ['id', 'workspace_id', 'title', 'position']) &&
+        rowsMatchSnapshot(savedTabs.data ?? [], snapshot.tabs, ['id', 'section_id', 'title', 'position']) &&
+        rowsMatchSnapshot(savedContents.data ?? [], snapshot.tabContents, ['id', 'tab_id', 'content']);
+
+      if (!isVerified) {
+        throw new Error('O servidor nao confirmou o snapshot completo do workspace.');
+      }
+
       hiddenLeadingWorkspaceIdRef.current = snapshot.hiddenLeadingWorkspaceId;
       remoteIdsRef.current = {
         workspaces: new Set(snapshot.workspaceIds),
@@ -628,124 +534,60 @@ export function DashboardProvider({ children }) {
     }
   };
 
-  const persistTabContents = async (nextState, tabIds) => {
-    if (!user?.id || !tabIds.size) return true;
-
-    const snapshot = buildWorkspaceSnapshot(nextState.workspace, user.id, hiddenLeadingWorkspaceIdRef.current);
-    const rows = snapshot.tabContents.filter((row) => tabIds.has(row.tab_id));
-    if (!rows.length) return true;
-
-    const { error } = await supabase.from('tab_contents').upsert(rows, { onConflict: 'id' });
-    if (error) {
-      console.error('Erro ao sincronizar conteudo das abas:', error);
-      return false;
-    }
-
-    return true;
-  };
-
-  const mergePendingPersist = (nextState, mode = 'full', tabId = null) => {
-    const current = pendingPersistRef.current;
-    const tabIds = new Set(current?.tabIds ?? []);
-    if (tabId) tabIds.add(tabId);
-
-    pendingPersistRef.current = {
-      state: nextState,
-      mode: current?.mode === 'full' || mode === 'full' ? 'full' : 'tabs',
-      tabIds,
-    };
-  };
-
-  const scheduleRetry = () => {
-    if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
-    const delay = RETRY_DELAYS[Math.min(retryCountRef.current, RETRY_DELAYS.length - 1)];
-    retryCountRef.current += 1;
-    retryTimerRef.current = window.setTimeout(() => {
-      retryTimerRef.current = null;
-      void processPersistQueue();
-    }, delay);
-  };
-
-  const processPersistQueue = async () => {
-    if (persistInFlightRef.current || !pendingPersistRef.current || !user?.id) return;
+  const saveWorkspaceChanges = async () => {
+    if (!user?.id || persistInFlightRef.current) return false;
 
     if (!navigator.onLine) {
       setSyncStatus('offline');
-      setSyncError('Sem conexao. Suas alteracoes estao salvas neste dispositivo e serao sincronizadas automaticamente.');
-      return;
+      setSyncError('Sem conexao. As alteracoes continuam protegidas neste dispositivo. Tente salvar novamente quando voltar.');
+      cacheState(stateRef.current, true, true);
+      return false;
     }
 
+    const snapshotState = stateRef.current;
+    const snapshotRevision = localRevisionRef.current;
     persistInFlightRef.current = true;
+    setSyncStatus('saving');
+    setSyncError('');
+    cacheState(snapshotState, true, true);
 
-    while (pendingPersistRef.current) {
-      const job = pendingPersistRef.current;
-      pendingPersistRef.current = null;
-      setSyncStatus('saving');
-      setSyncError('');
-
-      const success =
-        job.mode === 'full'
-          ? await persistState(job.state)
-          : await persistTabContents(job.state, job.tabIds);
-
-      if (!success) {
-        const newerJob = pendingPersistRef.current;
-        pendingPersistRef.current = {
-          state: newerJob?.state ?? job.state,
-          mode: newerJob?.mode === 'full' || job.mode === 'full' ? 'full' : 'tabs',
-          tabIds: new Set([...(job.tabIds ?? []), ...(newerJob?.tabIds ?? [])]),
-        };
-        setSyncStatus(navigator.onLine ? 'error' : 'offline');
-        setSyncError('Falha temporaria ao sincronizar. Suas alteracoes foram preservadas e tentaremos novamente.');
-        cacheState(pendingPersistRef.current.state, true, true);
-        scheduleRetry();
-        break;
-      }
-
-      retryCountRef.current = 0;
-      setLastSyncedAt(new Date());
-    }
-
+    const success = await persistState(snapshotState);
     persistInFlightRef.current = false;
 
-    if (!pendingPersistRef.current) {
-      setSyncStatus('saved');
+    if (!success) {
+      setHasUnsavedChanges(true);
+      hasUnsavedChangesRef.current = true;
+      setSyncStatus(navigator.onLine ? 'error' : 'offline');
+      setSyncError('Falha ao salvar no servidor. Nada foi descartado: suas alteracoes permanecem neste dispositivo. Tente novamente.');
+      cacheState(stateRef.current, true, true);
+      return false;
+    }
+
+    const changedDuringSave = localRevisionRef.current !== snapshotRevision;
+    setLastSyncedAt(new Date());
+
+    if (changedDuringSave) {
+      setHasUnsavedChanges(true);
+      hasUnsavedChangesRef.current = true;
+      setSyncStatus('pending');
       setSyncError('');
-      cacheState(stateRef.current, false, true);
-    }
-  };
-
-  const queuePersist = (nextState, options = {}) => {
-    const { debounceMs = 0, mode = 'full', tabId = null } = options;
-
-    if (syncTimerRef.current) {
-      window.clearTimeout(syncTimerRef.current);
-      syncTimerRef.current = null;
+      cacheState(stateRef.current, true, true);
+      return true;
     }
 
-    if (!user?.id) return;
-
-    mergePendingPersist(nextState, mode, tabId);
-    cacheState(nextState, true);
-    setSyncStatus(navigator.onLine ? 'pending' : 'offline');
-
-    if (debounceMs > 0) {
-      syncTimerRef.current = window.setTimeout(() => {
-        syncTimerRef.current = null;
-        void processPersistQueue();
-      }, debounceMs);
-      return;
-    }
-
-    void processPersistQueue();
+    setHasUnsavedChanges(false);
+    hasUnsavedChangesRef.current = false;
+    setSyncStatus('saved');
+    setSyncError('');
+    cacheState(snapshotState, false, true);
+    return true;
   };
 
   useEffect(() => {
     const handleOnline = () => {
-      if (pendingPersistRef.current) {
+      if (hasUnsavedChangesRef.current) {
         setSyncStatus('pending');
-        setSyncError('Conexao restaurada. Sincronizando alteracoes pendentes...');
-        void processPersistQueue();
+        setSyncError('');
       } else {
         setSyncStatus('saved');
         setSyncError('');
@@ -754,18 +596,13 @@ export function DashboardProvider({ children }) {
 
     const handleOffline = () => {
       setSyncStatus('offline');
-      setSyncError('Sem conexao. Suas alteracoes continuarao salvas neste dispositivo.');
-      cacheState(stateRef.current, Boolean(pendingPersistRef.current), true);
+      setSyncError('Sem conexao. Suas alteracoes continuarao protegidas neste dispositivo.');
+      cacheState(stateRef.current, hasUnsavedChangesRef.current, true);
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState !== 'hidden') return;
-      cacheState(stateRef.current, Boolean(pendingPersistRef.current), true);
-      if (syncTimerRef.current && navigator.onLine) {
-        window.clearTimeout(syncTimerRef.current);
-        syncTimerRef.current = null;
-        void processPersistQueue();
-      }
+      cacheState(stateRef.current, hasUnsavedChangesRef.current, true);
     };
 
     window.addEventListener('online', handleOnline);
@@ -779,11 +616,29 @@ export function DashboardProvider({ children }) {
     };
   }, [user?.id]);
 
-  const updateState = (updater, options = {}) => {
+  useEffect(() => {
+    if (!hasUnsavedChanges) return undefined;
+
+    const handleBeforeUnload = (event) => {
+      cacheState(stateRef.current, true, true);
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges, user?.id]);
+
+  const updateState = (updater) => {
     setState((current) => {
       const nextState = validateState(updater(current));
       stateRef.current = nextState;
-      queuePersist(nextState, options);
+      localRevisionRef.current += 1;
+      setHasUnsavedChanges(true);
+      hasUnsavedChangesRef.current = true;
+      setSyncStatus(navigator.onLine ? 'pending' : 'offline');
+      setSyncError('');
+      cacheState(nextState, true);
       return nextState;
     });
   };
@@ -1072,26 +927,26 @@ export function DashboardProvider({ children }) {
         );
       },
       updateTabContent(sectionId, tabId, payload) {
-        updateState(
-          (current) => ({
-            ...current,
-            workspace: mapWorkspace(current.workspace, sectionId, (section) =>
-              section.type === 'section'
-                ? {
-                    ...section,
-                    tabs: section.tabs.map((tab) => (tab.id === tabId ? { ...tab, ...payload } : tab)),
-                  }
-                : section,
-            ),
-          }),
-          { debounceMs: 800, mode: 'tabs', tabId },
-        );
+        updateState((current) => ({
+          ...current,
+          workspace: mapWorkspace(current.workspace, sectionId, (section) =>
+            section.type === 'section'
+              ? {
+                  ...section,
+                  tabs: section.tabs.map((tab) => (tab.id === tabId ? { ...tab, ...payload } : tab)),
+                }
+              : section,
+          ),
+        }));
       },
       importData(payload) {
         updateState(() => validateState(payload));
       },
       clearSyncError() {
         setSyncError('');
+      },
+      saveChanges() {
+        return saveWorkspaceChanges();
       },
       reloadWorkspace() {
         void loadWorkspace();
@@ -1118,9 +973,10 @@ export function DashboardProvider({ children }) {
       syncError,
       syncStatus,
       lastSyncedAt,
+      hasUnsavedChanges,
       actions,
     }),
-    [state, selectedTitle, selectedSection, activeTab, isLoadingWorkspace, syncError, syncStatus, lastSyncedAt, actions],
+    [state, selectedTitle, selectedSection, activeTab, isLoadingWorkspace, syncError, syncStatus, lastSyncedAt, hasUnsavedChanges, actions],
   );
 
   return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;

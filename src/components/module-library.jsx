@@ -21,7 +21,7 @@ const fileIcon = (
 );
 
 const overlayButtonClass =
-  'flex size-8 items-center justify-center rounded-full border border-[#3a404d] bg-[#11141a]/90 text-[#a1a1aa] opacity-0 transition duration-150 hover:scale-105 hover:text-white group-hover:opacity-100';
+  'flex size-8 items-center justify-center rounded-full border border-[#3a404d] bg-[#11141a]/90 text-[#a1a1aa] opacity-100 transition duration-150 hover:scale-105 hover:text-white sm:opacity-0 sm:group-hover:opacity-100';
 
 const formatTypeLabel = (value) => {
   if (value === 'module') return 'Módulo';
@@ -59,8 +59,8 @@ export function ModuleLibrary({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col p-5">
-      <div className="mb-5 flex items-center justify-between gap-4 rounded-[28px] border border-[#2a2f3a] bg-white/[0.045] px-5 py-4 shadow-[0_24px_80px_rgba(0,0,0,0.2)] backdrop-blur-xl">
+    <div className="flex h-full min-h-0 flex-col p-2 sm:p-5">
+      <div className="mb-2 flex items-center justify-between gap-3 rounded-[20px] border border-[#2a2f3a] bg-white/[0.045] px-3 py-3 shadow-[0_24px_80px_rgba(0,0,0,0.2)] backdrop-blur-xl sm:mb-5 sm:rounded-[28px] sm:px-5 sm:py-4">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-[#a1a1aa]">{title}</p>
           <h3 className="mt-1 text-lg font-semibold text-white">{subtitle}</h3>
@@ -76,12 +76,12 @@ export function ModuleLibrary({
       </div>
 
       {modules.length === 0 ? (
-        <div className="flex min-h-[280px] flex-1 items-center justify-center rounded-[30px] border border-dashed border-[#3a404d] bg-white/[0.04] p-8 text-center text-[#a1a1aa]">
+        <div className="flex min-h-[220px] flex-1 items-center justify-center rounded-[20px] border border-dashed border-[#3a404d] bg-white/[0.04] p-4 text-center text-[#a1a1aa] sm:min-h-[280px] sm:rounded-[30px] sm:p-8">
           {emptyMessage}
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto rounded-[30px] border border-[#2a2f3a] bg-white/[0.035] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.16)] backdrop-blur-xl">
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5">
+        <div className="min-h-0 flex-1 overflow-auto rounded-[20px] border border-[#2a2f3a] bg-white/[0.035] p-3 shadow-[0_24px_80px_rgba(0,0,0,0.16)] backdrop-blur-xl sm:rounded-[30px] sm:p-6">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] sm:gap-5">
             {modules.map((module) => (
               <button
                 key={module.id ?? module.file_url ?? module.title}

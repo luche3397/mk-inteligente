@@ -7,6 +7,8 @@ export function Sidebar({
   isPublicLibraryActive,
   isPrivateLibraryActive,
   isLoggingOut,
+  isMobileOpen,
+  onCloseMobile,
   onAddTitle,
   onAddSection,
   onRenameTitle,
@@ -38,9 +40,23 @@ export function Sidebar({
   };
 
   return (
-    <aside className="flex h-full w-[340px] min-w-[340px] flex-col border-r border-[#2a2f3a] bg-[#1a1d23]/95 backdrop-blur-2xl">
+    <aside
+      className={`fixed inset-y-0 left-0 z-[80] flex h-full w-[min(88vw,340px)] flex-col border-r border-[#2a2f3a] bg-[#1a1d23]/98 shadow-2xl backdrop-blur-2xl transition-transform duration-200 md:static md:z-auto md:w-[340px] md:min-w-[340px] md:translate-x-0 md:shadow-none ${
+        isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}
+    >
       <div className="sticky top-0 z-10 border-b border-[#2a2f3a] bg-[#1a1d23]/95 px-5 py-5 backdrop-blur-xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#a1a1aa]">Workspace</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#a1a1aa]">Workspace</p>
+          <button
+            type="button"
+            onClick={onCloseMobile}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#3a404d] bg-[#20232a] text-sm text-white md:hidden"
+            aria-label="Fechar menu do workspace"
+          >
+            X
+          </button>
+        </div>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <button
             type="button"

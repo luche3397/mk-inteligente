@@ -1,0 +1,61 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { buildWorkspaceSnapshot, rowsMatchSnapshot } from '../src/utils/workspace-snapshot.js';
+
+test('mantém o workspace oculto correto quando existem títulos depois dele', () => {
+  const workspace = [
+    { id: 'section-before-title', type: 'section', name: 'Entrada', tabs: [] },
+    { id: 'visible-title', type: 'title', title: 'Projetos', color: '#ffffff' },
+    { id: 'section-after-title', type: 'section', name: 'Ativos', tabs: [] },
+  ];
+
+  const snapshot = buildWorkspaceSnapshot(workspace, 'user-1', 'hidden-workspace');
+
+  assert.equal(snapshot.hiddenLeadingWorkspaceId, 'hidden-workspace');
+  assert.equal(snapshot.sections[0].workspace_id, 'hidden-workspace');
+  assert.equal(snapshot.sections[1].workspace_id, 'visible-title');
+});
+
+test('snapshot completo não mantém abas removidas e preserva todo o conteúdo atual', () => {
+  const workspace = [
+    { id: 'title-1', type: 'title', title: 'Projetos', color: '#ffffff' },
+    {
+      id: 'section-1',
+      type: 'section',
+      name: 'Ativos',
+      tabs: [
+        {
+          id: 'tab-current',
+          name: 'Documento',
+          type: 'note',
+          content: 'conteúdo mais recente',
+          fileUrl: null,
+          noteZoom: 1.2,
+          viewMode: 'content',
+          canvasDocument: null,
+          status: 'em revisão',
+        },
+      ],
+    },
+  ];
+
+  const snapshot = buildWorkspaceSnapshot(workspace, 'user-1', null);
+  const savedContent = JSON.parse(snapshot.tabContents[0].content);
+
+  assert.deepEqual(snapshot.tabIds, ['tab-current']);
+  assert.equal(snapshot.tabs.some((tab) => tab.id === 'tab-removed'), false);
+  assert.equal(savedContent.content, 'conteúdo mais recente');
+  assert.equal(savedContent.noteZoom, 1.2);
+  assert.equal(savedContent.status, 'em revisão');
+});
+
+test('verificação rejeita registros antigos que reapareceriam no próximo login', () => {
+  const expected = [{ id: 'tab-current', title: 'Documento', position: 0 }];
+  const remoteWithStaleTab = [
+    ...expected,
+    { id: 'tab-removed', title: 'Antiga', position: 1 },
+  ];
+
+  assert.equal(rowsMatchSnapshot(expected, expected, ['id', 'title', 'position']), true);
+  assert.equal(rowsMatchSnapshot(remoteWithStaleTab, expected, ['id', 'title', 'position']), false);
+});

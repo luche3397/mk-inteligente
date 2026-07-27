@@ -126,6 +126,7 @@ function App() {
     syncError,
     syncStatus,
     lastSyncedAt,
+    hasUnsavedChanges,
     actions,
   } = useDashboard();
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
@@ -133,6 +134,7 @@ function App() {
   const [activeView, setActiveView] = useState('workspace');
   const [isImportingData, setIsImportingData] = useState(false);
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [publicLibraryModules, setPublicLibraryModules] = useState([]);
   const [privateLibraryModules, setPrivateLibraryModules] = useState([]);
@@ -616,10 +618,10 @@ function App() {
   };
 
   const renderEmptyWorkspace = () => (
-    <div className="flex h-full items-center justify-center p-8">
-      <div className="max-w-2xl rounded-[32px] border border-[#2a2f3a] bg-white/[0.04] p-8 text-center shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+    <div className="flex h-full items-center justify-center p-3 sm:p-8">
+      <div className="max-w-2xl rounded-[24px] border border-[#2a2f3a] bg-white/[0.04] p-5 text-center shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:rounded-[32px] sm:p-8">
         <p className="text-xs uppercase tracking-[0.35em] text-[#a1a1aa]">Workspace</p>
-        <h3 className="mt-3 text-3xl font-semibold text-white">Crie o primeiro item do seu workspace</h3>
+        <h3 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">Crie o primeiro item do seu workspace</h3>
         <p className="mt-4 text-sm leading-7 text-[#a1a1aa]">
           Organize o painel com titulos visuais e secoes independentes com abas e suporte a HTML.
         </p>
@@ -644,10 +646,10 @@ function App() {
   );
 
   const renderEmptySection = () => (
-    <div className="flex h-full items-center justify-center p-8">
-      <div className="max-w-xl rounded-[32px] border border-[#2a2f3a] bg-white/[0.04] p-8 text-center shadow-[0_24px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+    <div className="flex h-full items-center justify-center p-3 sm:p-8">
+      <div className="max-w-xl rounded-[24px] border border-[#2a2f3a] bg-white/[0.04] p-5 text-center shadow-[0_24px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl sm:rounded-[32px] sm:p-8">
         <p className="text-xs uppercase tracking-[0.35em] text-[#a1a1aa]">Secoes</p>
-        <h3 className="mt-3 text-3xl font-semibold text-white">Nenhuma secao selecionada</h3>
+        <h3 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">Nenhuma secao selecionada</h3>
         <p className="mt-4 text-sm leading-7 text-[#a1a1aa]">
           Adicione ou selecione uma secao independente na barra lateral para continuar.
         </p>
@@ -681,14 +683,14 @@ function App() {
           onReorderTab={(tabId, targetTabId) => actions.reorderTab(selectedSection.id, tabId, targetTabId)}
         />
 
-        <div className="min-h-0 flex-1 overflow-hidden p-5">
+        <div className="min-h-0 flex-1 overflow-hidden p-2 sm:p-5">
           {activeTab ? (
-            <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[30px] border border-[#2a2f3a] bg-white/[0.045] shadow-[0_24px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl">
-              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#2a2f3a] px-5 py-4">
-                <div>
+            <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-[#2a2f3a] bg-white/[0.045] shadow-[0_24px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl sm:rounded-[30px]">
+              <div className="flex flex-col gap-4 border-b border-[#2a2f3a] px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5 sm:py-4">
+                <div className="min-w-0">
                   <p className="text-xs uppercase tracking-[0.3em] text-[#a1a1aa]">Aba ativa</p>
-                  <div className="mt-1 flex items-center gap-3">
-                    <h3 className="text-lg font-semibold text-white">{activeTab.name}</h3>
+                  <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+                    <h3 className="max-w-full truncate text-base font-semibold text-white sm:text-lg">{activeTab.name}</h3>
                     <span className="rounded-full border border-[#3a404d] bg-[#2a2f3a]/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-[#d4d4d8]">
                       {activeTab.type === 'module'
                         ? 'Módulo'
@@ -715,7 +717,7 @@ function App() {
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex w-full items-center gap-2 overflow-x-auto pb-1 sm:w-auto sm:flex-wrap sm:gap-3 sm:overflow-visible sm:pb-0">
                   <input
                     ref={htmlModuleInputRef}
                     type="file"
@@ -733,14 +735,14 @@ function App() {
                   <button
                     type="button"
                     onClick={handleSaveCurrentTabToPrivateLibrary}
-                    className="rounded-xl border border-[#3a404d] bg-[#1f3b2d] px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#28503d]"
+                    className="shrink-0 rounded-xl border border-[#3a404d] bg-[#1f3b2d] px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#28503d]"
                   >
                     Guardar
                   </button>
                   <button
                     type="button"
                     onClick={handleToggleQuadro}
-                    className={`rounded-xl border px-4 py-2 text-sm font-medium text-white transition duration-200 ${
+                    className={`shrink-0 rounded-xl border px-4 py-2 text-sm font-medium text-white transition duration-200 ${
                       activeTab.viewMode === 'quadro'
                         ? 'border-[#7c83ff] bg-[#3a3f6b] hover:bg-[#4a4f7a]'
                         : 'border-[#3a404d] bg-[#20232a] hover:bg-[#2f3542]'
@@ -759,18 +761,18 @@ function App() {
                         status: activeTab?.type === 'note' ? activeTab.status ?? 'novo' : 'novo',
                       })
                     }
-                    className="rounded-xl border border-[#3a404d] bg-transparent px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#2f3542]"
+                    className="shrink-0 rounded-xl border border-[#3a404d] bg-transparent px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#2f3542]"
                   >
                     Nova Nota
                   </button>
                   <button
                     type="button"
                     onClick={() => activeTab && actions.duplicateTab(selectedSection.id, activeTab.id)}
-                    className="rounded-xl border border-[#3a404d] bg-[#20232a] px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#2f3542]"
+                    className="shrink-0 rounded-xl border border-[#3a404d] bg-[#20232a] px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-[#2f3542]"
                   >
                     Duplicar
                   </button>
-                  <div ref={importMenuRef} className="relative">
+                  <div ref={importMenuRef} className="relative shrink-0">
                     <button
                       type="button"
                       onClick={() => setIsImportMenuOpen((current) => !current)}
@@ -814,7 +816,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-auto p-5">
+              <div className="min-h-0 flex-1 overflow-auto p-2 sm:p-5">
                 {activeTab.viewMode === 'quadro' ? (
                   <QuadroCanvas
                     documentValue={activeTab.canvasDocument ?? createDefaultCanvasDocument()}
@@ -906,14 +908,24 @@ function App() {
   };
 
   const renderWorkspace = () => (
-    <div className="h-screen overflow-hidden bg-[#0f1115] text-white">
+    <div className="h-[100dvh] overflow-hidden bg-[#0f1115] text-white">
       <div className="flex h-full overflow-hidden">
+        {isMobileSidebarOpen ? (
+          <button
+            type="button"
+            aria-label="Fechar menu"
+            onClick={() => setIsMobileSidebarOpen(false)}
+            className="fixed inset-0 z-[70] bg-black/65 backdrop-blur-sm md:hidden"
+          />
+        ) : null}
         <Sidebar
           workspace={state.workspace}
           selectedSectionId={state.selectedSectionId}
           isPublicLibraryActive={activeView === 'library-public'}
           isPrivateLibraryActive={activeView === 'library-private'}
           isLoggingOut={isLoggingOut}
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={() => setIsMobileSidebarOpen(false)}
           onAddTitle={actions.addTitle}
           onAddSection={actions.addSection}
           onRenameTitle={actions.renameTitle}
@@ -925,15 +937,58 @@ function App() {
           onSelectSection={(sectionId) => {
             setActiveView('workspace');
             actions.selectSection(sectionId);
+            setIsMobileSidebarOpen(false);
           }}
-          onOpenPublicLibrary={() => setActiveView('library-public')}
-          onOpenPrivateLibrary={() => setActiveView('library-private')}
+          onOpenPublicLibrary={() => {
+            setActiveView('library-public');
+            setIsMobileSidebarOpen(false);
+          }}
+          onOpenPrivateLibrary={() => {
+            setActiveView('library-private');
+            setIsMobileSidebarOpen(false);
+          }}
           onLogout={handleLogout}
         />
 
         <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+          <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[#2a2f3a] bg-[#15181e] px-3 py-2.5 sm:px-5">
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#3a404d] bg-[#20232a] text-xl text-white md:hidden"
+                aria-label="Abrir menu do workspace"
+              >
+                ☰
+              </button>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-white">
+                  {activeView === 'library-public'
+                    ? 'Biblioteca Pública'
+                    : activeView === 'library-private'
+                      ? 'Biblioteca Privada'
+                      : selectedSection?.name || 'Workspace'}
+                </p>
+                <p className="text-xs text-[#8f95a3]">
+                  {hasUnsavedChanges ? 'Alterações protegidas localmente' : 'Sem alterações pendentes'}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void actions.saveChanges()}
+              disabled={syncStatus === 'saving' || !hasUnsavedChanges}
+              className={`shrink-0 rounded-xl border px-3 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm ${
+                hasUnsavedChanges
+                  ? 'border-[#3d6a51] bg-[#1f4a34] text-white hover:bg-[#285d42]'
+                  : 'border-[#343a46] bg-[#20232a] text-[#7f8694]'
+              } disabled:cursor-not-allowed disabled:opacity-70`}
+            >
+              {syncStatus === 'saving' ? 'Salvando...' : 'Salvar alterações'}
+            </button>
+          </header>
           {syncError ? (
-            <div className="border-b border-[#3b1f25] bg-[#2a161a] px-6 py-3 text-sm text-[#f4c7cf]">
+            <div className="shrink-0 border-b border-[#3b1f25] bg-[#2a161a] px-3 py-2 text-xs text-[#f4c7cf] sm:px-6 sm:py-3 sm:text-sm">
               {syncError}
             </div>
           ) : null}
@@ -987,7 +1042,7 @@ function App() {
           </section>
           {syncStatus !== 'idle' && syncStatus !== 'loading' ? (
             <div
-              className={`pointer-events-none absolute bottom-4 right-5 z-50 rounded-xl border px-3 py-2 text-xs font-medium shadow-lg backdrop-blur-xl ${
+              className={`pointer-events-none absolute bottom-3 right-3 z-50 rounded-xl border px-3 py-2 text-xs font-medium shadow-lg backdrop-blur-xl sm:bottom-4 sm:right-5 ${
                 syncStatus === 'saved'
                   ? 'border-[#294537] bg-[#14251dcc] text-[#a7e7c3]'
                   : syncStatus === 'offline' || syncStatus === 'error'
@@ -998,12 +1053,12 @@ function App() {
               {syncStatus === 'saving'
                 ? 'Salvando...'
                 : syncStatus === 'pending'
-                  ? 'Alteracoes pendentes'
+                  ? 'Alterações não salvas'
                   : syncStatus === 'offline'
-                    ? 'Offline - alteracoes protegidas'
+                    ? 'Offline - alterações protegidas'
                     : syncStatus === 'error'
-                      ? 'Sincronizacao pendente'
-                      : `Salvo${lastSyncedAt ? ` as ${lastSyncedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}`}
+                      ? 'Falha ao salvar'
+                      : `Salvo${lastSyncedAt ? ` às ${lastSyncedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}`}
             </div>
           ) : null}
         </main>

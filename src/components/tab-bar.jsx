@@ -27,7 +27,7 @@ export function TabBar({
   };
 
   return (
-    <div className="border-b border-[#2a2f3a] bg-white/[0.02] px-4 py-3">
+    <div className="border-b border-[#2a2f3a] bg-white/[0.02] px-2 py-2 sm:px-4 sm:py-3">
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
@@ -39,7 +39,7 @@ export function TabBar({
               onDragStart={(event) => handleDragStart(event, tab.id)}
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => handleDrop(event, tab.id)}
-              className={`group flex min-w-[220px] max-w-[320px] items-center gap-2 rounded-t-[22px] border px-3 py-2 transition duration-200 ${
+              className={`group flex min-w-[170px] max-w-[260px] items-center gap-2 rounded-t-[18px] border px-3 py-2 transition duration-200 sm:min-w-[220px] sm:max-w-[320px] sm:rounded-t-[22px] ${
                 isActive
                   ? 'border-[#3a404d] bg-[#1a1d23] text-white'
                   : 'border-transparent bg-white/[0.04] text-[#a1a1aa] hover:bg-[#20232a]'
