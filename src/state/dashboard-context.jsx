@@ -10,7 +10,11 @@ import {
 import { useAuth } from './auth-context';
 import { supabase } from '../supabaseClient';
 import { loadWorkspaceCache, saveWorkspaceCache } from '../utils/workspace-cache';
-import { buildWorkspaceSnapshot, rowsMatchSnapshot } from '../utils/workspace-snapshot';
+import {
+  buildWorkspaceSnapshot,
+  chunkRowsBySerializedSize,
+  rowsMatchSnapshot,
+} from '../utils/workspace-snapshot';
 
 const DashboardContext = createContext(null);
 
@@ -399,11 +403,13 @@ export function DashboardProvider({ children }) {
   }, [isAuthenticated, isAuthLoading, user?.id]);
 
   const persistState = async (nextState) => {
-    if (!user?.id) return false;
+    if (!user?.id) return { success: false, error: 'Sessao de usuario indisponivel.' };
 
     const snapshot = buildWorkspaceSnapshot(nextState.workspace, user.id, hiddenLeadingWorkspaceIdRef.current);
+    let currentStage = 'preparar o salvamento';
 
     try {
+      currentStage = 'consultar o estado atual';
       const [remoteWorkspaces, remoteSections, remoteTabs, remoteContents] = await Promise.all([
         supabase.from('workspaces').select('id').eq('user_id', user.id),
         supabase.from('sections').select('id').eq('user_id', user.id),
@@ -421,6 +427,7 @@ export function DashboardProvider({ children }) {
       };
 
       if (snapshot.workspaces.length) {
+        currentStage = 'salvar os titulos';
         const { error } = await supabase.from('workspaces').upsert(snapshot.workspaces, {
           onConflict: 'id',
         });
@@ -428,6 +435,7 @@ export function DashboardProvider({ children }) {
       }
 
       if (snapshot.sections.length) {
+        currentStage = 'salvar as secoes';
         const { error } = await supabase.from('sections').upsert(snapshot.sections, {
           onConflict: 'id',
         });
@@ -435,6 +443,7 @@ export function DashboardProvider({ children }) {
       }
 
       if (snapshot.tabs.length) {
+        currentStage = 'salvar as abas';
         const { error } = await supabase.from('tabs').upsert(snapshot.tabs, {
           onConflict: 'id',
         });
@@ -442,10 +451,14 @@ export function DashboardProvider({ children }) {
       }
 
       if (snapshot.tabContents.length) {
-        const { error } = await supabase.from('tab_contents').upsert(snapshot.tabContents, {
-          onConflict: 'id',
-        });
-        if (error) throw error;
+        const contentChunks = chunkRowsBySerializedSize(snapshot.tabContents);
+        for (let index = 0; index < contentChunks.length; index += 1) {
+          currentStage = `salvar os conteudos (${index + 1}/${contentChunks.length})`;
+          const { error } = await supabase.from('tab_contents').upsert(contentChunks[index], {
+            onConflict: 'id',
+          });
+          if (error) throw error;
+        }
       }
 
       const workspaceIdsToDelete = [...remoteIdsRef.current.workspaces].filter(
@@ -460,6 +473,7 @@ export function DashboardProvider({ children }) {
         .filter((id) => !snapshot.tabIds.includes(id));
 
       if (contentIdsToDelete.length) {
+        currentStage = 'remover conteudos antigos';
         const { error } = await supabase
           .from('tab_contents')
           .delete()
@@ -469,6 +483,7 @@ export function DashboardProvider({ children }) {
       }
 
       if (tabIdsToDelete.length) {
+        currentStage = 'remover abas antigas';
         const { error: deleteTabsError } = await supabase
           .from('tabs')
           .delete()
@@ -478,6 +493,7 @@ export function DashboardProvider({ children }) {
       }
 
       if (sectionIdsToDelete.length) {
+        currentStage = 'remover secoes antigas';
         const { error } = await supabase
           .from('sections')
           .delete()
@@ -485,11 +501,13 @@ export function DashboardProvider({ children }) {
           .in('id', sectionIdsToDelete);
         if (error) throw error;
       } else if (snapshot.sectionIds.length === 0 && remoteIdsRef.current.sections.size > 0) {
+        currentStage = 'remover todas as secoes antigas';
         const { error } = await supabase.from('sections').delete().eq('user_id', user.id);
         if (error) throw error;
       }
 
       if (workspaceIdsToDelete.length) {
+        currentStage = 'remover titulos antigos';
         const { error } = await supabase
           .from('workspaces')
           .delete()
@@ -497,15 +515,17 @@ export function DashboardProvider({ children }) {
           .in('id', workspaceIdsToDelete);
         if (error) throw error;
       } else if (snapshot.workspaceIds.length === 0 && remoteIdsRef.current.workspaces.size > 0) {
+        currentStage = 'remover todos os titulos antigos';
         const { error } = await supabase.from('workspaces').delete().eq('user_id', user.id);
         if (error) throw error;
       }
 
+      currentStage = 'confirmar o snapshot salvo';
       const [savedWorkspaces, savedSections, savedTabs, savedContents] = await Promise.all([
         supabase.from('workspaces').select('id,title').eq('user_id', user.id),
         supabase.from('sections').select('id,workspace_id,title,position').eq('user_id', user.id),
         supabase.from('tabs').select('id,section_id,title,position').eq('user_id', user.id),
-        supabase.from('tab_contents').select('id,tab_id,content').eq('user_id', user.id),
+        supabase.from('tab_contents').select('id,tab_id').eq('user_id', user.id),
       ]);
       const verificationResponses = [savedWorkspaces, savedSections, savedTabs, savedContents];
       const failedVerification = verificationResponses.find((response) => response.error);
@@ -515,7 +535,7 @@ export function DashboardProvider({ children }) {
         rowsMatchSnapshot(savedWorkspaces.data ?? [], snapshot.workspaces, ['id', 'title']) &&
         rowsMatchSnapshot(savedSections.data ?? [], snapshot.sections, ['id', 'workspace_id', 'title', 'position']) &&
         rowsMatchSnapshot(savedTabs.data ?? [], snapshot.tabs, ['id', 'section_id', 'title', 'position']) &&
-        rowsMatchSnapshot(savedContents.data ?? [], snapshot.tabContents, ['id', 'tab_id', 'content']);
+        rowsMatchSnapshot(savedContents.data ?? [], snapshot.tabContents, ['id', 'tab_id']);
 
       if (!isVerified) {
         throw new Error('O servidor nao confirmou o snapshot completo do workspace.');
@@ -527,10 +547,11 @@ export function DashboardProvider({ children }) {
         sections: new Set(snapshot.sectionIds),
         tabs: new Set(snapshot.tabIds),
       };
-      return true;
+      return { success: true, error: '' };
     } catch (error) {
       console.error('Erro ao sincronizar workspace com o Supabase:', error);
-      return false;
+      const errorMessage = error?.message || error?.details || 'Erro desconhecido do Supabase.';
+      return { success: false, error: `Nao foi possivel ${currentStage}: ${errorMessage}` };
     }
   };
 
@@ -551,14 +572,16 @@ export function DashboardProvider({ children }) {
     setSyncError('');
     cacheState(snapshotState, true, true);
 
-    const success = await persistState(snapshotState);
+    const result = await persistState(snapshotState);
     persistInFlightRef.current = false;
 
-    if (!success) {
+    if (!result.success) {
       setHasUnsavedChanges(true);
       hasUnsavedChangesRef.current = true;
       setSyncStatus(navigator.onLine ? 'error' : 'offline');
-      setSyncError('Falha ao salvar no servidor. Nada foi descartado: suas alteracoes permanecem neste dispositivo. Tente novamente.');
+      setSyncError(
+        `Falha ao salvar. Suas alteracoes permanecem neste dispositivo. ${result.error}`,
+      );
       cacheState(stateRef.current, true, true);
       return false;
     }

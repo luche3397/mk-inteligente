@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildWorkspaceSnapshot, rowsMatchSnapshot } from '../src/utils/workspace-snapshot.js';
+import {
+  buildWorkspaceSnapshot,
+  chunkRowsBySerializedSize,
+  rowsMatchSnapshot,
+} from '../src/utils/workspace-snapshot.js';
 
 test('mantém o workspace oculto correto quando existem títulos depois dele', () => {
   const workspace = [
@@ -58,4 +62,17 @@ test('verificação rejeita registros antigos que reapareceriam no próximo logi
 
   assert.equal(rowsMatchSnapshot(expected, expected, ['id', 'title', 'position']), true);
   assert.equal(rowsMatchSnapshot(remoteWithStaleTab, expected, ['id', 'title', 'position']), false);
+});
+
+test('divide conteúdos grandes em lotes sem perder nenhuma aba', () => {
+  const rows = [
+    { id: 'a', content: 'a'.repeat(80) },
+    { id: 'b', content: 'b'.repeat(80) },
+    { id: 'c', content: 'c'.repeat(80) },
+  ];
+
+  const chunks = chunkRowsBySerializedSize(rows, 150);
+
+  assert.ok(chunks.length > 1);
+  assert.deepEqual(chunks.flat().map((row) => row.id), ['a', 'b', 'c']);
 });

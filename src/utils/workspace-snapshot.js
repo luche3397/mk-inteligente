@@ -134,3 +134,25 @@ export const rowsMatchSnapshot = (remoteRows, snapshotRows, fields) => {
 
   return JSON.stringify(normalize(remoteRows)) === JSON.stringify(normalize(snapshotRows));
 };
+
+export const chunkRowsBySerializedSize = (rows, maximumBytes = 600_000) => {
+  const chunks = [];
+  let currentChunk = [];
+  let currentSize = 2;
+
+  rows.forEach((row) => {
+    const rowSize = new TextEncoder().encode(JSON.stringify(row)).length + 1;
+
+    if (currentChunk.length && currentSize + rowSize > maximumBytes) {
+      chunks.push(currentChunk);
+      currentChunk = [];
+      currentSize = 2;
+    }
+
+    currentChunk.push(row);
+    currentSize += rowSize;
+  });
+
+  if (currentChunk.length) chunks.push(currentChunk);
+  return chunks;
+};
