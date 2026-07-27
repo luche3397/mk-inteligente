@@ -11,6 +11,10 @@ import { useAuth } from './auth-context';
 import { supabase } from '../supabaseClient';
 import { loadWorkspaceCache, saveWorkspaceCache } from '../utils/workspace-cache';
 import {
+  compressWorkspaceContent,
+  decompressWorkspaceContent,
+} from '../utils/workspace-content-codec';
+import {
   buildWorkspaceSnapshot,
   chunkRowsBySerializedSize,
   rowsMatchSnapshot,
@@ -262,7 +266,12 @@ export function DashboardProvider({ children }) {
       const workspaces = workspacesResponse.data ?? [];
       const sections = sectionsResponse.data ?? [];
       const tabs = tabsResponse.data ?? [];
-      const contents = contentsResponse.data ?? [];
+      const contents = await Promise.all(
+        (contentsResponse.data ?? []).map(async (item) => ({
+          ...item,
+          content: await decompressWorkspaceContent(item.content),
+        })),
+      );
 
       const sectionMap = new Map();
       const tabMap = new Map();
@@ -425,6 +434,41 @@ export function DashboardProvider({ children }) {
         sections: new Set((remoteSections.data ?? []).map((item) => item.id)),
         tabs: new Set((remoteTabs.data ?? []).map((item) => item.id)),
       };
+      const remoteContentIds = new Set((remoteContents.data ?? []).map((item) => item.id));
+
+      const saveContentRows = async (rows) => {
+        const { error } = await supabase.from('tab_contents').upsert(rows, { onConflict: 'id' });
+        if (!error) return;
+
+        const isTimeout = /statement timeout|canceling statement/i.test(
+          `${error.message ?? ''} ${error.details ?? ''}`,
+        );
+
+        if (isTimeout && rows.length > 1) {
+          const middle = Math.ceil(rows.length / 2);
+          await saveContentRows(rows.slice(0, middle));
+          await saveContentRows(rows.slice(middle));
+          return;
+        }
+
+        if (isTimeout && rows.length === 1 && remoteContentIds.has(rows[0].id)) {
+          const row = rows[0];
+          const { error: updateError } = await supabase
+            .from('tab_contents')
+            .update({
+              tab_id: row.tab_id,
+              user_id: row.user_id,
+              content: row.content,
+              updated_at: row.updated_at,
+            })
+            .eq('id', row.id)
+            .eq('user_id', user.id);
+          if (!updateError) return;
+          throw updateError;
+        }
+
+        throw error;
+      };
 
       if (snapshot.workspaces.length) {
         currentStage = 'salvar os titulos';
@@ -451,13 +495,17 @@ export function DashboardProvider({ children }) {
       }
 
       if (snapshot.tabContents.length) {
-        const contentChunks = chunkRowsBySerializedSize(snapshot.tabContents);
+        currentStage = 'compactar os conteudos';
+        const persistedContents = await Promise.all(
+          snapshot.tabContents.map(async (row) => ({
+            ...row,
+            content: await compressWorkspaceContent(row.content),
+          })),
+        );
+        const contentChunks = chunkRowsBySerializedSize(persistedContents, 120_000);
         for (let index = 0; index < contentChunks.length; index += 1) {
           currentStage = `salvar os conteudos (${index + 1}/${contentChunks.length})`;
-          const { error } = await supabase.from('tab_contents').upsert(contentChunks[index], {
-            onConflict: 'id',
-          });
-          if (error) throw error;
+          await saveContentRows(contentChunks[index]);
         }
       }
 

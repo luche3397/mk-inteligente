@@ -5,6 +5,10 @@ import {
   chunkRowsBySerializedSize,
   rowsMatchSnapshot,
 } from '../src/utils/workspace-snapshot.js';
+import {
+  compressWorkspaceContent,
+  decompressWorkspaceContent,
+} from '../src/utils/workspace-content-codec.js';
 
 test('mantém o workspace oculto correto quando existem títulos depois dele', () => {
   const workspace = [
@@ -75,4 +79,17 @@ test('divide conteúdos grandes em lotes sem perder nenhuma aba', () => {
 
   assert.ok(chunks.length > 1);
   assert.deepEqual(chunks.flat().map((row) => row.id), ['a', 'b', 'c']);
+});
+
+test('compacta conteúdo grande e restaura o texto original', async () => {
+  const original = JSON.stringify({
+    type: 'html',
+    content: `<main>${'<section>conteúdo</section>'.repeat(4_000)}</main>`,
+  });
+
+  const compressed = await compressWorkspaceContent(original);
+  const restored = await decompressWorkspaceContent(compressed);
+
+  assert.ok(compressed.length < original.length);
+  assert.equal(restored, original);
 });
