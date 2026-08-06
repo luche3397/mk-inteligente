@@ -26,7 +26,7 @@ export const createTitle = (title = 'Novo titulo') => ({
   id: createId(),
   type: 'title',
   title,
-  color: '#ffffff',
+  color: '#ECEBE8',
 });
 
 export const createSection = (name = 'Nova secao', overrides = {}) => ({
@@ -78,7 +78,7 @@ const normalizeTitleItem = (item, index) => ({
   id: isUuid(item?.id) ? item.id : createId(),
   type: 'title',
   title: typeof item?.title === 'string' && item.title.trim() ? item.title : `Titulo ${index + 1}`,
-  color: typeof item?.color === 'string' && item.color.trim() ? item.color : '#ffffff',
+  color: typeof item?.color === 'string' && item.color.trim() ? item.color : '#ECEBE8',
 });
 
 const normalizeSectionItem = (item, index) => ({

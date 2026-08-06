@@ -742,6 +742,7 @@ function App() {
                   <button
                     type="button"
                     onClick={handleToggleQuadro}
+                    aria-pressed={activeTab.viewMode === 'quadro'}
                     className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium text-white transition duration-200 ${
                       activeTab.viewMode === 'quadro'
                         ? 'border-[#7c83ff] bg-[#3a3f6b] hover:bg-[#4a4f7a]'

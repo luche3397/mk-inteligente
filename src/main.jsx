@@ -15,11 +15,11 @@ const application = isSupabaseConfigured ? (
     </AuthProvider>
   </React.StrictMode>
 ) : (
-  <main className="flex min-h-screen items-center justify-center bg-[#0f1115] p-6 text-white">
-    <section className="w-full max-w-xl rounded-3xl border border-[#5b3c26] bg-[#241a13] p-6 shadow-2xl sm:p-8">
-      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#e8b77f]">Configuração necessária</p>
+  <main className="flex min-h-screen items-center justify-center bg-[#1F1E1D] p-6 text-[#ECEBE8]">
+    <section className="w-full max-w-xl border border-[#3A3936] bg-[#2D2C2B] p-6 sm:p-8">
+      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#8C8A85]">Configuração necessária</p>
       <h1 className="mt-3 text-2xl font-semibold">Supabase não configurado</h1>
-      <p className="mt-4 text-sm leading-6 text-[#d7c7bb]">
+      <p className="mt-4 text-sm leading-6 text-[#8C8A85]">
         Cadastre as variáveis <strong>VITE_SUPABASE_URL</strong> e <strong>VITE_SUPABASE_ANON_KEY</strong> no
         ambiente de hospedagem e faça um novo deploy.
       </p>

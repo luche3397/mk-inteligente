@@ -7,10 +7,10 @@ const applyButtonStyles = (buttonEl) => {
   buttonEl.style.top = '8px';
   buttonEl.style.right = '8px';
   buttonEl.style.zIndex = '10';
-  buttonEl.style.border = '1px solid rgba(255,255,255,0.1)';
+  buttonEl.style.border = '1px solid #3A3936';
   buttonEl.style.borderRadius = '8px';
-  buttonEl.style.background = 'rgba(17,20,26,0.6)';
-  buttonEl.style.color = 'rgba(255,255,255,0.7)';
+  buttonEl.style.background = '#2D2C2B';
+  buttonEl.style.color = '#8C8A85';
   buttonEl.style.padding = '4px 8px';
   buttonEl.style.fontSize = '12px';
   buttonEl.style.lineHeight = '1';
@@ -21,14 +21,14 @@ const applyButtonStyles = (buttonEl) => {
 
   buttonEl.addEventListener('mouseenter', () => {
     buttonEl.style.opacity = '1';
-    buttonEl.style.background = 'rgba(17,20,26,0.9)';
-    buttonEl.style.color = 'rgba(255,255,255,1)';
+    buttonEl.style.background = '#3D3C3A';
+    buttonEl.style.color = '#ECEBE8';
   });
 
   buttonEl.addEventListener('mouseleave', () => {
     buttonEl.style.opacity = '0.8';
-    buttonEl.style.background = 'rgba(17,20,26,0.6)';
-    buttonEl.style.color = 'rgba(255,255,255,0.7)';
+    buttonEl.style.background = '#2D2C2B';
+    buttonEl.style.color = '#8C8A85';
   });
 };
 
@@ -71,8 +71,8 @@ const createTextContent = ({ textContent }) => {
   contentEl.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace';
   contentEl.style.fontSize = '13px';
   contentEl.style.lineHeight = '1.6';
-  contentEl.style.color = '#e4e4e7';
-  contentEl.style.background = '#0f1115';
+  contentEl.style.color = '#ECEBE8';
+  contentEl.style.background = '#1F1E1D';
   contentEl.textContent = textContent ?? '';
   return contentEl;
 };
@@ -89,8 +89,7 @@ const openExpandOverlay = (descriptor) => {
   overlayEl.style.alignItems = 'center';
   overlayEl.style.justifyContent = 'center';
   overlayEl.style.padding = '24px';
-  overlayEl.style.background = 'rgba(0,0,0,0.8)';
-  overlayEl.style.backdropFilter = 'blur(4px)';
+  overlayEl.style.background = 'rgba(26,25,24,0.94)';
 
   const boxEl = document.createElement('div');
   boxEl.id = 'fd-ampliar-box';
@@ -98,10 +97,9 @@ const openExpandOverlay = (descriptor) => {
   boxEl.style.width = '85vw';
   boxEl.style.height = '88vh';
   boxEl.style.overflow = 'hidden';
-  boxEl.style.borderRadius = '28px';
-  boxEl.style.border = '1px solid rgba(255,255,255,0.1)';
-  boxEl.style.background = '#11141a';
-  boxEl.style.boxShadow = '0 24px 80px rgba(0,0,0,0.45)';
+  boxEl.style.borderRadius = '0';
+  boxEl.style.border = '1px solid #3A3936';
+  boxEl.style.background = '#2D2C2B';
 
   const closeButtonEl = document.createElement('button');
   closeButtonEl.id = 'fd-ampliar-close';
@@ -111,10 +109,10 @@ const openExpandOverlay = (descriptor) => {
   closeButtonEl.style.top = '12px';
   closeButtonEl.style.right = '12px';
   closeButtonEl.style.zIndex = '1';
-  closeButtonEl.style.border = '1px solid rgba(255,255,255,0.1)';
-  closeButtonEl.style.borderRadius = '10px';
-  closeButtonEl.style.background = 'rgba(17,20,26,0.72)';
-  closeButtonEl.style.color = 'rgba(255,255,255,0.8)';
+  closeButtonEl.style.border = '1px solid #3A3936';
+  closeButtonEl.style.borderRadius = '0';
+  closeButtonEl.style.background = '#2D2C2B';
+  closeButtonEl.style.color = '#ECEBE8';
   closeButtonEl.style.padding = '6px 10px';
   closeButtonEl.style.cursor = 'pointer';
 

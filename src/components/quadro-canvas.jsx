@@ -23,8 +23,8 @@ import {
   worldToScreen,
 } from '../utils/canvas';
 
-const COLORS = [null, '#7c83ff', '#2dd4bf', '#f59e0b', '#f472b6', '#ef4444'];
-const NEUTRAL_COLOR = '#8b8b8b';
+const COLORS = [null, '#ECEBE8', '#B8B6B0', '#8C8A85', '#5F5D59', '#3A3936'];
+const NEUTRAL_COLOR = '#8C8A85';
 const SIDES = ['top', 'right', 'bottom', 'left'];
 const RESIZE_HANDLES = ['nw', 'ne', 'se', 'sw'];
 const CLIPBOARD_PREFIX = 'workspace-quadro:';
@@ -66,7 +66,7 @@ const ResizeHandles = () => (
         type="button"
         data-resize-handle={handle}
         aria-label={`Redimensionar pelo ponto ${handle}`}
-        className={`absolute z-30 h-3 w-3 rounded-full border border-[#7c83ff] bg-white shadow-sm ${
+        className={`absolute z-30 h-3 w-3 rounded-full border border-[#ECEBE8] bg-[#2D2C2B] ${
           {
             nw: '-left-1.5 -top-1.5 cursor-nwse-resize',
             n: 'left-1/2 -top-1.5 -translate-x-1/2 cursor-ns-resize',
@@ -93,7 +93,7 @@ const ConnectionHandles = ({ nodeId }) => (
         data-node-id={nodeId}
         title={`Criar conexão pela lateral ${side}`}
         aria-label={`Criar conexão pela lateral ${side}`}
-        className={`absolute z-30 h-3.5 w-3.5 rounded-full border-2 border-[#11141a] bg-[#8b91ff] shadow ${
+        className={`absolute z-30 h-3.5 w-3.5 rounded-full border-2 border-[#1F1E1D] bg-[#ECEBE8] ${
           {
             top: 'left-1/2 -top-2 -translate-x-1/2',
             right: '-right-2 top-1/2 -translate-y-1/2',
@@ -108,9 +108,17 @@ const ConnectionHandles = ({ nodeId }) => (
 
 function CanvasNode({ node, selected, hovered, connectionTarget, editing, lowDetail, onEdit, onHoverChange, onTextChange, onTextCommit, onOpenImage }) {
   const textAreaRef = useRef(null);
-  const colorStyle = node.color
-    ? { borderColor: node.color, backgroundColor: `${node.color}18` }
-    : { borderColor: NEUTRAL_COLOR, backgroundColor: 'transparent', boxShadow: 'none' };
+  const borderColor = selected
+    ? '#ECEBE8'
+    : connectionTarget
+      ? '#B8B6B0'
+      : hovered
+        ? '#8C8A85'
+        : node.color || NEUTRAL_COLOR;
+  const colorStyle = {
+    '--canvas-node-border': borderColor,
+    '--canvas-node-background': node.color ? `${node.color}18` : 'transparent',
+  };
 
   useEffect(() => {
     if (!editing || node.type !== 'text' || !textAreaRef.current) return;
@@ -122,9 +130,10 @@ function CanvasNode({ node, selected, hovered, connectionTarget, editing, lowDet
     <div
       data-node-id={node.id}
       data-node-type={node.type}
+      data-canvas-node
       className={`absolute cursor-grab select-none rounded-2xl border shadow-[0_14px_34px_rgba(0,0,0,0.28)] active:cursor-grabbing ${
         node.type === 'group' ? 'bg-[#15182180]' : 'bg-[#191c23]'
-      } ${selected ? 'border-[#8b91ff] ring-1 ring-[#8b91ff]' : connectionTarget ? 'border-[#65d8c5] ring-2 ring-[#65d8c580]' : hovered ? 'border-[#666e80] ring-1 ring-[#666e8060]' : 'border-[#343946]'}`}
+      }`}
       style={{ left: node.x, top: node.y, width: node.width, height: node.height, zIndex: node.zIndex, ...colorStyle }}
       onPointerEnter={() => onHoverChange(node.id)}
       onPointerLeave={() => onHoverChange(null)}
@@ -150,7 +159,7 @@ function CanvasNode({ node, selected, hovered, connectionTarget, editing, lowDet
             className="h-full w-full resize-none select-text rounded-2xl bg-transparent px-4 py-3 text-sm leading-6 text-white outline-none"
           />
         ) : (
-          <div className="h-full overflow-hidden whitespace-pre-wrap break-words px-4 py-3 text-sm leading-6 text-[#f4f4f5]">
+          <div className="h-full overflow-hidden whitespace-pre-wrap break-words px-4 py-3 text-sm leading-6 text-white">
             {lowDetail ? (node.text || 'Texto').slice(0, 80) : node.text || 'Novo texto'}
           </div>
         )
@@ -202,8 +211,9 @@ function FloatingButton({ children, onClick, title, disabled = false, active = f
       disabled={disabled}
       title={title}
       aria-label={title}
+      aria-pressed={active}
       className={`rounded-xl border px-3 py-2 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-35 ${
-        active ? 'border-[#858cff] bg-[#3a3f6b]' : 'border-[#3a404d] bg-[#20232a] hover:bg-[#2f3542]'
+        active ? 'border-[#ECEBE8] bg-[#3D3C3A]' : 'border-[#3A3936] bg-[#2D2C2B] hover:bg-[#3D3C3A]'
       }`}
     >
       {children}
@@ -218,12 +228,13 @@ function ContextIconButton({ children, onClick, title, active = false, danger = 
       onClick={onClick}
       title={title}
       aria-label={title}
+      aria-pressed={active}
       className={`flex h-8 w-8 items-center justify-center rounded-lg border text-sm transition ${
         danger
-          ? 'border-[#5a3037] bg-[#2a171c] text-[#ff9b9b] hover:bg-[#3b2028]'
+          ? 'border-[#8C8A85] bg-[#2D2C2B] text-[#ECEBE8] hover:bg-[#3D3C3A]'
           : active
-            ? 'border-[#7c83ff] bg-[#343861] text-white'
-            : 'border-[#383e4b] bg-[#20232a] text-[#e5e7eb] hover:bg-[#303541]'
+            ? 'border-[#ECEBE8] bg-[#3D3C3A] text-[#ECEBE8]'
+            : 'border-[#3A3936] bg-[#2D2C2B] text-[#ECEBE8] hover:bg-[#3D3C3A]'
       }`}
     >
       {children}
@@ -770,7 +781,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
       tabIndex={0}
       role="application"
       aria-label="Quadro visual infinito"
-      className={`relative h-full min-h-[420px] w-full overflow-hidden rounded-3xl border border-[#2a2f3a] bg-[#0f1115] outline-none focus-visible:ring-2 focus-visible:ring-[#7c83ff] ${interactionVisual?.type === 'panning' || interactionVisual?.type === 'dragging-nodes' ? 'cursor-grabbing' : 'cursor-default'}`}
+      className={`relative h-full min-h-[420px] w-full overflow-hidden border border-[#3A3936] bg-[#1F1E1D] outline-none ${interactionVisual?.type === 'panning' || interactionVisual?.type === 'dragging-nodes' ? 'cursor-grabbing' : 'cursor-default'}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -837,7 +848,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
             const source = documentState.nodes.find((node) => node.id === interactionVisual.fromNode);
             if (!source) return null;
             const start = getNodeAnchor(source, interactionVisual.fromSide);
-            return <path d={getBezierPath(start, interactionVisual.point, interactionVisual.fromSide, 'left')} fill="none" stroke="#8b91ff" strokeWidth="2" strokeDasharray="7 5" />;
+            return <path d={getBezierPath(start, interactionVisual.point, interactionVisual.fromSide, 'left')} fill="none" stroke="#ECEBE8" strokeWidth="2" strokeDasharray="7 5" />;
           })() : null}
         </svg>
 
@@ -846,7 +857,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
         ))}
 
         {interactionVisual?.type === 'selecting' && Math.hypot(interactionVisual.current.x - interactionVisual.start.x, interactionVisual.current.y - interactionVisual.start.y) > 3 ? (
-          <div className="pointer-events-none absolute border border-[#8b91ff] bg-[#7c83ff20]" style={{ left: Math.min(interactionVisual.start.x, interactionVisual.current.x), top: Math.min(interactionVisual.start.y, interactionVisual.current.y), width: Math.abs(interactionVisual.current.x - interactionVisual.start.x), height: Math.abs(interactionVisual.current.y - interactionVisual.start.y) }} />
+          <div className="pointer-events-none absolute border border-[#ECEBE8] bg-[#ECEBE80d]" style={{ left: Math.min(interactionVisual.start.x, interactionVisual.current.x), top: Math.min(interactionVisual.start.y, interactionVisual.current.y), width: Math.abs(interactionVisual.current.x - interactionVisual.start.x), height: Math.abs(interactionVisual.current.y - interactionVisual.start.y) }} />
         ) : null}
       </div>
 
@@ -857,15 +868,15 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m14.7 5.3 4 4M4 20l4.5-1 10.2-10.2a2.1 2.1 0 0 0-3-3L5.5 16 4 20Z" /><path d="M3 3h6v6H3z" /></svg>
             </ContextIconButton>
             {isColorPaletteOpen ? (
-              <div className="absolute left-1/2 top-full mt-2 flex -translate-x-1/2 items-center gap-1.5 rounded-xl border border-[#353a47] bg-[#13161df5] p-2 shadow-xl">
-                {COLORS.map((color) => <button key={color || 'none'} type="button" title={color ? 'Aplicar cor' : 'Remover cor'} aria-label={color ? `Cor ${color}` : 'Sem cor'} onClick={() => changeSelectionColor(color)} className="h-6 w-6 rounded-full border border-white/20 transition hover:scale-110" style={{ background: color || NEUTRAL_COLOR }} />)}
+              <div className="absolute left-1/2 top-full mt-2 flex -translate-x-1/2 items-center gap-1.5 border border-[#3A3936] bg-[#2D2C2B] p-2">
+                {COLORS.map((color) => <button key={color || 'none'} type="button" data-color-swatch title={color ? 'Aplicar tom' : 'Remover tom'} aria-label={color ? `Tom ${color}` : 'Sem tom'} onClick={() => changeSelectionColor(color)} className="h-6 w-6 border border-[#3A3936] transition" style={{ '--swatch-color': color || NEUTRAL_COLOR }} />)}
               </div>
             ) : null}
           </div>
           {selection.nodeIds.length ? (
             <>
               <ContextIconButton title="Duplicar seleção" onClick={() => duplicateSelection()}><span className="text-xl font-light leading-none">+</span></ContextIconButton>
-              <ContextIconButton title="Agrupar seleção" onClick={createGroup}><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="3" width="11" height="11" rx="2" /><rect x="10" y="10" width="11" height="11" rx="2" /></svg></ContextIconButton>
+              <ContextIconButton title="Agrupar seleção" onClick={createGroup}><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="3" width="11" height="11" /><rect x="10" y="10" width="11" height="11" /></svg></ContextIconButton>
             </>
           ) : null}
           <ContextIconButton title="Excluir seleção" danger onClick={removeSelection}><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></svg></ContextIconButton>

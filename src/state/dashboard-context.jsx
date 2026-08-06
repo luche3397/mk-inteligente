@@ -98,7 +98,7 @@ const parseWorkspaceTitle = (value, index) => {
     if (parsed && typeof parsed === 'object' && typeof parsed.label === 'string') {
       return {
         label: parsed.label,
-        color: typeof parsed.color === 'string' ? parsed.color : '#ffffff',
+        color: typeof parsed.color === 'string' ? parsed.color : '#ECEBE8',
         position: Number.isInteger(parsed.position) ? parsed.position : index,
         hidden: parsed.hidden === true,
       };
@@ -109,7 +109,7 @@ const parseWorkspaceTitle = (value, index) => {
 
   return {
     label: value || `Titulo ${index + 1}`,
-    color: '#ffffff',
+    color: '#ECEBE8',
     position: index,
     hidden: false,
   };

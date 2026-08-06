@@ -48,7 +48,7 @@ export const buildWorkspaceSnapshot = (workspace, userId, hiddenLeadingWorkspace
         user_id: userId,
         title: serializeWorkspaceTitle({
           label: '',
-          color: '#ffffff',
+          color: '#ECEBE8',
           position: workspacePosition,
           hidden: true,
         }),
@@ -69,7 +69,7 @@ export const buildWorkspaceSnapshot = (workspace, userId, hiddenLeadingWorkspace
         user_id: userId,
         title: serializeWorkspaceTitle({
           label: item.title,
-          color: item.color ?? '#ffffff',
+          color: item.color ?? '#ECEBE8',
           position: workspacePosition,
           hidden: false,
         }),

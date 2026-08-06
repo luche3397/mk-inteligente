@@ -44,6 +44,7 @@ export function TabBar({
           return (
             <div
               key={tab.id}
+              data-active-tab={isActive}
               draggable
               onDragStart={(event) => handleDragStart(event, tab.id)}
               onDragOver={(event) => event.preventDefault()}

@@ -10,18 +10,18 @@ const fileIcon = (
       d="M14 6.5H27.5L36 15V38C36 39.6569 34.6569 41 33 41H14C12.3431 41 11 39.6569 11 38V9.5C11 7.84315 12.3431 6.5 14 6.5Z"
       stroke="currentColor"
       strokeWidth="2"
-      fill="currentColor"
-      className="text-[#20232a]"
+      fill="none"
+      className="text-[#8C8A85]"
     />
-    <path d="M27 6.5V15H35.5" stroke="#8f99aa" strokeWidth="2" strokeLinejoin="round" />
-    <path d="M17 22H30" stroke="#8f99aa" strokeWidth="2" strokeLinecap="round" />
-    <path d="M17 28H30" stroke="#8f99aa" strokeWidth="2" strokeLinecap="round" />
-    <path d="M17 34H25" stroke="#8f99aa" strokeWidth="2" strokeLinecap="round" />
+    <path d="M27 6.5V15H35.5" stroke="#8C8A85" strokeWidth="2" strokeLinejoin="round" />
+    <path d="M17 22H30" stroke="#8C8A85" strokeWidth="2" strokeLinecap="round" />
+    <path d="M17 28H30" stroke="#8C8A85" strokeWidth="2" strokeLinecap="round" />
+    <path d="M17 34H25" stroke="#8C8A85" strokeWidth="2" strokeLinecap="round" />
   </svg>
 );
 
 const overlayButtonClass =
-  'flex size-8 items-center justify-center rounded-full border border-[#3a404d] bg-[#11141a]/90 text-[#a1a1aa] opacity-100 transition duration-150 hover:scale-105 hover:text-white sm:opacity-0 sm:group-hover:opacity-100';
+  'flex size-8 items-center justify-center rounded-full border border-[#3a404d] bg-[#11141a]/90 text-[#a1a1aa] opacity-100 transition duration-150 hover:text-white sm:opacity-0 sm:group-hover:opacity-100';
 
 const formatTypeLabel = (value) => {
   if (value === 'module') return 'Módulo';
