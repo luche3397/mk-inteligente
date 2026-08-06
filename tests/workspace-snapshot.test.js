@@ -7,6 +7,7 @@ import {
 } from '../src/utils/workspace-snapshot.js';
 import {
   compressWorkspaceContent,
+  createWorkspaceContentSignature,
   decompressWorkspaceContent,
 } from '../src/utils/workspace-content-codec.js';
 
@@ -92,4 +93,13 @@ test('compacta conteúdo grande e restaura o texto original', async () => {
 
   assert.ok(compressed.length < original.length);
   assert.equal(restored, original);
+});
+
+test('gera assinaturas iguais somente para conteudos iguais', async () => {
+  const first = await createWorkspaceContentSignature('conteudo importante');
+  const second = await createWorkspaceContentSignature('conteudo importante');
+  const changed = await createWorkspaceContentSignature('conteudo alterado');
+
+  assert.equal(first, second);
+  assert.notEqual(first, changed);
 });

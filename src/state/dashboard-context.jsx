@@ -12,12 +12,14 @@ import { supabase } from '../supabaseClient';
 import { loadWorkspaceCache, saveWorkspaceCache } from '../utils/workspace-cache';
 import {
   compressWorkspaceContent,
+  createWorkspaceContentSignature,
   decompressWorkspaceContent,
 } from '../utils/workspace-content-codec';
 import {
   buildWorkspaceSnapshot,
   chunkRowsBySerializedSize,
   rowsMatchSnapshot,
+  serializeTabContent,
 } from '../utils/workspace-snapshot';
 
 const DashboardContext = createContext(null);
@@ -183,6 +185,7 @@ export function DashboardProvider({ children }) {
     sections: new Set(),
     tabs: new Set(),
   });
+  const savedContentSignaturesRef = useRef(new Map());
 
   useEffect(() => {
     stateRef.current = state;
@@ -220,6 +223,7 @@ export function DashboardProvider({ children }) {
         sections: new Set(),
         tabs: new Set(),
       };
+      savedContentSignaturesRef.current = new Map();
       return;
     }
 
@@ -271,6 +275,17 @@ export function DashboardProvider({ children }) {
           ...item,
           content: await decompressWorkspaceContent(item.content),
         })),
+      );
+      savedContentSignaturesRef.current = new Map(
+        await Promise.all(
+          contents.map(async (item) => {
+            const parsedContent = parseTabContent(item.content);
+            return [
+              item.tab_id,
+              await createWorkspaceContentSignature(serializeTabContent(parsedContent)),
+            ];
+          }),
+        ),
       );
 
       const sectionMap = new Map();
@@ -405,6 +420,7 @@ export function DashboardProvider({ children }) {
         sections: new Set(),
         tabs: new Set(),
       };
+      savedContentSignaturesRef.current = new Map();
       return;
     }
 
@@ -435,6 +451,16 @@ export function DashboardProvider({ children }) {
         tabs: new Set((remoteTabs.data ?? []).map((item) => item.id)),
       };
       const remoteContentIds = new Set((remoteContents.data ?? []).map((item) => item.id));
+      const contentRowsWithSignatures = await Promise.all(
+        snapshot.tabContents.map(async (row) => ({
+          row,
+          signature: await createWorkspaceContentSignature(row.content),
+        })),
+      );
+      const changedContentRows = contentRowsWithSignatures.filter(
+        ({ row, signature }) =>
+          !remoteContentIds.has(row.id) || savedContentSignaturesRef.current.get(row.id) !== signature,
+      );
 
       const saveContentRows = async (rows) => {
         const { error } = await supabase.from('tab_contents').upsert(rows, { onConflict: 'id' });
@@ -494,10 +520,10 @@ export function DashboardProvider({ children }) {
         if (error) throw error;
       }
 
-      if (snapshot.tabContents.length) {
+      if (changedContentRows.length) {
         currentStage = 'compactar os conteudos';
         const persistedContents = await Promise.all(
-          snapshot.tabContents.map(async (row) => ({
+          changedContentRows.map(async ({ row }) => ({
             ...row,
             content: await compressWorkspaceContent(row.content),
           })),
@@ -595,6 +621,9 @@ export function DashboardProvider({ children }) {
         sections: new Set(snapshot.sectionIds),
         tabs: new Set(snapshot.tabIds),
       };
+      savedContentSignaturesRef.current = new Map(
+        contentRowsWithSignatures.map(({ row, signature }) => [row.id, signature]),
+      );
       return { success: true, error: '' };
     } catch (error) {
       console.error('Erro ao sincronizar workspace com o Supabase:', error);

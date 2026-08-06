@@ -58,3 +58,21 @@ export const decompressWorkspaceContent = async (value) => {
     return value;
   }
 };
+
+export const createWorkspaceContentSignature = async (value) => {
+  const content = typeof value === 'string' ? value : '';
+  const bytes = new TextEncoder().encode(content);
+
+  if (globalThis.crypto?.subtle) {
+    const digest = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes));
+    const hash = Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    return `${bytes.length}:${hash}`;
+  }
+
+  let hash = 2166136261;
+  for (const byte of bytes) {
+    hash ^= byte;
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${bytes.length}:${(hash >>> 0).toString(16)}`;
+};

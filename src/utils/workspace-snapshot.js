@@ -6,7 +6,7 @@ const serializeWorkspaceTitle = ({ label, color, position, hidden = false }) =>
     hidden,
   });
 
-const serializeTabContent = (tab) =>
+export const serializeTabContent = (tab) =>
   JSON.stringify({
     type: tab.type === 'module' || tab.type === 'note' || tab.type === 'pdf' ? tab.type : 'html',
     content: typeof tab.content === 'string' ? tab.content : '',
