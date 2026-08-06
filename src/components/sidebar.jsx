@@ -8,7 +8,10 @@ export function Sidebar({
   isPrivateLibraryActive,
   isLoggingOut,
   isMobileOpen,
+  syncStatus,
+  hasUnsavedChanges,
   onCloseMobile,
+  onSaveChanges,
   onAddTitle,
   onAddSection,
   onRenameTitle,
@@ -202,8 +205,21 @@ export function Sidebar({
       <div className="border-t border-[#2a2f3a] px-3 py-3">
         <button
           type="button"
-          onClick={onOpenPrivateLibrary}
+          onClick={onSaveChanges}
+          disabled={syncStatus === 'saving' || !hasUnsavedChanges}
           className={`w-full rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition duration-200 ${
+            hasUnsavedChanges
+              ? 'border-[#3d6a51] bg-[#1f4a34] text-white hover:bg-[#285d42]'
+              : 'border-[#343a46] bg-[#20232a] text-[#7f8694]'
+          } disabled:cursor-not-allowed disabled:opacity-70`}
+        >
+          {syncStatus === 'saving' ? 'Salvando...' : 'Salvar alterações'}
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenPrivateLibrary}
+          className={`mt-3 w-full rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition duration-200 ${
             isPrivateLibraryActive
               ? 'border-[#454d5c] bg-[#2a2f3a] text-white'
               : 'border-[#2a2f3a] bg-white/[0.03] text-white hover:border-[#3a404d] hover:bg-white/[0.05]'

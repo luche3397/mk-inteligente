@@ -9,6 +9,7 @@ export function TabBar({
   onCloseTab,
   onDuplicateTab,
   onReorderTab,
+  onOpenMenu,
 }) {
   const handleDragStart = (event, tabId) => {
     event.dataTransfer.effectAllowed = 'move';
@@ -27,8 +28,16 @@ export function TabBar({
   };
 
   return (
-    <div className="border-b border-[#2a2f3a] bg-white/[0.02] px-2 py-2 sm:px-4 sm:py-3">
+    <div className="border-b border-[#2a2f3a] bg-white/[0.02] px-2 py-1.5 sm:px-4 sm:py-2">
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <button
+          type="button"
+          onClick={onOpenMenu}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#3a404d] bg-[#20232a] text-lg text-white md:hidden"
+          aria-label="Abrir menu do workspace"
+        >
+          ☰
+        </button>
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
 
@@ -39,7 +48,7 @@ export function TabBar({
               onDragStart={(event) => handleDragStart(event, tab.id)}
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => handleDrop(event, tab.id)}
-              className={`group flex min-w-[170px] max-w-[260px] items-center gap-2 rounded-t-[18px] border px-3 py-2 transition duration-200 sm:min-w-[220px] sm:max-w-[320px] sm:rounded-t-[22px] ${
+              className={`group flex min-w-[170px] max-w-[260px] items-center gap-2 rounded-t-[18px] border px-3 py-1.5 transition duration-200 sm:min-w-[220px] sm:max-w-[320px] sm:rounded-t-[22px] ${
                 isActive
                   ? 'border-[#3a404d] bg-[#1a1d23] text-white'
                   : 'border-transparent bg-white/[0.04] text-[#a1a1aa] hover:bg-[#20232a]'
@@ -82,7 +91,7 @@ export function TabBar({
         <button
           type="button"
           onClick={onAddTab}
-          className="flex h-11 w-11 items-center justify-center rounded-2xl border border-dashed border-[#3a404d] bg-white/[0.03] text-lg text-white transition duration-200 hover:bg-[#2f3542]"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-dashed border-[#3a404d] bg-white/[0.03] text-lg text-white transition duration-200 hover:bg-[#2f3542]"
         >
           +
         </button>
