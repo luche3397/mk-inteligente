@@ -95,6 +95,8 @@ export function Sidebar({
               return (
                 <div
                   key={item.id}
+                  data-sidebar-item
+                  data-selected={isSection && isSelectedSection ? 'true' : 'false'}
                   draggable
                   onDragStart={() => {
                     setDraggedItemId(item.id);

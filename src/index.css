@@ -86,7 +86,7 @@ select {
 }
 
 button {
-  background-color: var(--editorial-surface) !important;
+  background-color: transparent !important;
 }
 
 button:not(:disabled):hover {
@@ -102,7 +102,7 @@ button[data-color-swatch]:hover {
 }
 
 button:disabled {
-  background-color: var(--editorial-main) !important;
+  background-color: transparent !important;
   color: var(--editorial-muted) !important;
 }
 
@@ -182,6 +182,34 @@ aside {
 #root [data-workspace-container] {
   background-color: var(--editorial-main) !important;
   background-image: none !important;
+}
+
+#root button:not([data-color-swatch]) {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+#root button:not([data-color-swatch]):not(:disabled):hover {
+  background-color: rgba(236, 235, 232, 0.06) !important;
+}
+
+#root button[data-color-swatch] {
+  background-color: var(--swatch-color) !important;
+}
+
+#root [data-sidebar-item],
+#root [data-workspace-tab] {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+#root [data-sidebar-item]:hover,
+#root [data-workspace-tab]:hover {
+  background-color: rgba(236, 235, 232, 0.035) !important;
+}
+
+#root [data-sidebar-item][data-selected="true"] {
+  border-left-color: var(--editorial-text) !important;
 }
 
 #root [class*="text-[#"] {
