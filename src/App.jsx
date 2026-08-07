@@ -843,6 +843,20 @@ function App() {
                   />
                   <button
                     type="button"
+                    onClick={() => setIsAiPanelOpen((current) => !current)}
+                    aria-pressed={isAiPanelOpen}
+                    data-ui-variant="secondary"
+                    className="flex h-8 shrink-0 items-center gap-1 border border-transparent px-2.5 text-xs font-medium text-white transition duration-150"
+                    title={isAiPanelOpen ? 'Fechar Assistente IA' : 'Abrir Assistente IA'}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-3.5 w-3.5" aria-hidden="true">
+                      <path d="M12 3l1.3 4.2L17 9l-3.7 1.8L12 15l-1.3-4.2L7 9l3.7-1.8L12 3z" />
+                      <path d="M5 15l.8 2.2L8 18l-2.2.8L5 21l-.8-2.2L2 18l2.2-.8L5 15z" />
+                    </svg>
+                    IA
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleSaveCurrentTabToPrivateLibrary}
                     data-ui-variant="primary"
                     className="h-8 shrink-0 border px-2.5 text-xs font-semibold transition duration-150"
@@ -1080,21 +1094,6 @@ function App() {
         />
 
         <main data-main-shell className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-          {!isAiPanelOpen ? (
-            <button
-              type="button"
-              onClick={() => setIsAiPanelOpen(true)}
-              className="absolute right-0 top-1/2 z-[65] flex -translate-y-1/2 items-center gap-1 border border-r-0 border-[#5a5853] bg-[#181817] px-2 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#ecebe8]"
-              aria-label="Abrir Assistente IA"
-              title="Abrir Assistente IA"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4" aria-hidden="true">
-                <path d="M12 3l1.3 4.2L17 9l-3.7 1.8L12 15l-1.3-4.2L7 9l3.7-1.8L12 3z" />
-                <path d="M5 15l.8 2.2L8 18l-2.2.8L5 21l-.8-2.2L2 18l2.2-.8L5 15z" />
-              </svg>
-              IA
-            </button>
-          ) : null}
           {activeView !== 'workspace' || !selectedSection ? (
             <button
               type="button"
