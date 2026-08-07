@@ -242,7 +242,7 @@ function ContextIconButton({ children, onClick, title, active = false, danger = 
   );
 }
 
-export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage }) {
+export function QuadroCanvas({ documentValue, focusRequest, onFocusRequestHandled, onChange, onExit, onUploadImage }) {
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const importInputRef = useRef(null);
@@ -253,7 +253,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
   const historyRef = useRef({ past: [], future: [] });
   const clipboardRef = useRef(null);
   const [documentState, setDocumentState] = useState(documentRef.current);
-  const [selection, setSelection] = useState({ nodeIds: [], edgeId: null });
+  const [selection, setRawSelection] = useState({ nodeIds: [], edgeIds: [], edgeId: null });
   const [editing, setEditing] = useState(null);
   const [interactionVisual, setInteractionVisual] = useState(null);
   const [spacePressed, setSpacePressed] = useState(false);
@@ -263,6 +263,23 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
   const [isColorPaletteOpen, setIsColorPaletteOpen] = useState(false);
   const [customColor, setCustomColor] = useState('#7C83FF');
+
+  const setSelection = useCallback((nextSelection) => {
+    setRawSelection((currentSelection) => {
+      const resolved = typeof nextSelection === 'function' ? nextSelection(currentSelection) : nextSelection;
+      const edgeIds = Array.isArray(resolved?.edgeIds)
+        ? [...new Set(resolved.edgeIds)]
+        : resolved?.edgeId
+          ? [resolved.edgeId]
+          : [];
+      return {
+        ...resolved,
+        nodeIds: Array.isArray(resolved?.nodeIds) ? [...new Set(resolved.nodeIds)] : [],
+        edgeIds,
+        edgeId: edgeIds[0] ?? null,
+      };
+    });
+  }, []);
 
   const markerColors = useMemo(
     () => [...new Set([
@@ -296,6 +313,26 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
     const next = normalizeCanvasDocument(documentValue);
     if (serializeCanvasDocument(next) !== serializeCanvasDocument(documentRef.current)) setDocument(next, false);
   }, [documentValue, setDocument]);
+
+  useEffect(() => {
+    if (!focusRequest?.nodeId) return;
+    const node = documentRef.current.nodes.find((item) => item.id === focusRequest.nodeId);
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!node || !rect) return;
+    const zoom = documentRef.current.viewport.zoom;
+    setSelection({ nodeIds: [node.id], edgeIds: [] });
+    setEditing(null);
+    setDocument({
+      ...documentRef.current,
+      viewport: {
+        ...documentRef.current.viewport,
+        x: rect.width / (2 * zoom) - (node.x + node.width / 2),
+        y: rect.height / (2 * zoom) - (node.y + node.height / 2),
+      },
+    }, false);
+    canvasRef.current?.focus();
+    onFocusRequestHandled?.();
+  }, [focusRequest?.token, onFocusRequestHandled, setDocument, setSelection]);
 
   const getRect = () => canvasRef.current?.getBoundingClientRect();
   const screenPointToWorld = (clientX, clientY) => {
@@ -367,9 +404,9 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
   };
 
   const removeSelection = () => {
-    if (!selection.nodeIds.length && !selection.edgeId) return;
+    if (!selection.nodeIds.length && !selection.edgeIds.length) return;
     const previous = documentRef.current;
-    commit(deleteCanvasSelection(previous, selection.nodeIds, selection.edgeId ? [selection.edgeId] : []), previous);
+    commit(deleteCanvasSelection(previous, selection.nodeIds, selection.edgeIds), previous);
     setSelection({ nodeIds: [], edgeId: null });
     setEditing(null);
   };
@@ -427,7 +464,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
   const changeSelectionColor = (color, closePalette = true) => {
     const previous = documentRef.current;
     const nodes = previous.nodes.map((node) => selection.nodeIds.includes(node.id) ? { ...node, color: color || undefined, updatedAt: canvasNow() } : node);
-    const edges = previous.edges.map((edge) => edge.id === selection.edgeId ? { ...edge, color: color || undefined } : edge);
+    const edges = previous.edges.map((edge) => selection.edgeIds.includes(edge.id) ? { ...edge, color: color || undefined } : edge);
     commit({ ...previous, nodes, edges }, previous);
     if (closePalette) setIsColorPaletteOpen(false);
   };
@@ -607,7 +644,16 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
     if (event.button === 0 && edgeElement) {
       event.preventDefault();
       event.stopPropagation();
-      setSelection({ nodeIds: [], edgeId: edgeElement.dataset.edgeId });
+      const edgeId = edgeElement.dataset.edgeId;
+      const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+      setSelection((current) => ({
+        nodeIds: additive ? current.nodeIds : [],
+        edgeIds: additive
+          ? current.edgeIds.includes(edgeId)
+            ? current.edgeIds.filter((id) => id !== edgeId)
+            : [...current.edgeIds, edgeId]
+          : [edgeId],
+      }));
       return;
     }
 
@@ -631,8 +677,17 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
     if (handle && node) {
       event.preventDefault(); event.stopPropagation();
       event.currentTarget.setPointerCapture?.(event.pointerId);
-      setSelection({ nodeIds: [node.id], edgeId: null });
-      interactionRef.current = { type: 'resizing-node', nodeId: node.id, handle, startClient: { x: event.clientX, y: event.clientY }, startNode: node, startDocument: documentRef.current };
+      const resizingIds = selection.nodeIds.includes(node.id) ? selection.nodeIds : [node.id];
+      setSelection({ nodeIds: resizingIds, edgeIds: selection.nodeIds.includes(node.id) ? selection.edgeIds : [] });
+      interactionRef.current = {
+        type: 'resizing-nodes',
+        nodeId: node.id,
+        nodeIds: resizingIds,
+        handle,
+        startClient: { x: event.clientX, y: event.clientY },
+        startNodes: new Map(documentRef.current.nodes.filter((item) => resizingIds.includes(item.id)).map((item) => [item.id, item])),
+        startDocument: documentRef.current,
+      };
       return;
     }
     if (node) {
@@ -644,7 +699,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
     if (event.button === 0) {
       event.currentTarget.setPointerCapture?.(event.pointerId);
       const point = screenPointToWorld(event.clientX, event.clientY);
-      interactionRef.current = { type: 'selecting', start: point, current: point, additive: event.shiftKey || event.ctrlKey || event.metaKey, initialIds: selection.nodeIds };
+      interactionRef.current = { type: 'selecting', start: point, current: point, additive: event.shiftKey || event.ctrlKey || event.metaKey, initialIds: selection.nodeIds, initialEdgeIds: selection.edgeIds };
       if (!interactionRef.current.additive) setSelection({ nodeIds: [], edgeId: null });
       setInteractionVisual(interactionRef.current);
     }
@@ -665,7 +720,11 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
     if (interaction.type === 'selecting') {
       interaction.current = pointerWorldRef.current;
       const ids = nodesInSelection(documentRef.current.nodes.filter((node) => node.type !== 'group'), interaction.start, interaction.current);
-      setSelection({ nodeIds: interaction.additive ? [...new Set([...interaction.initialIds, ...ids])] : ids, edgeId: null });
+      const nodeIds = interaction.additive ? [...new Set([...interaction.initialIds, ...ids])] : ids;
+      const internalEdgeIds = documentRef.current.edges
+        .filter((edge) => nodeIds.includes(edge.fromNode) && nodeIds.includes(edge.toNode))
+        .map((edge) => edge.id);
+      setSelection({ nodeIds, edgeIds: interaction.additive ? [...new Set([...interaction.initialEdgeIds, ...internalEdgeIds])] : internalEdgeIds });
       setInteractionVisual({ ...interaction });
       return;
     }
@@ -688,22 +747,25 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
       setDocument({ ...interaction.startDocument, nodes }, false);
       return;
     }
-    if (interaction.type === 'resizing-node') {
+    if (interaction.type === 'resizing-nodes') {
       const dx = (event.clientX - interaction.startClient.x) / viewport.zoom;
       const dy = (event.clientY - interaction.startClient.y) / viewport.zoom;
-      const original = interaction.startNode;
-      const minWidth = original.type === 'image' ? 80 : original.type === 'group' ? 180 : 140;
-      const minHeight = original.type === 'image' ? 80 : original.type === 'group' ? 120 : 70;
-      let { x, y, width, height } = original;
-      if (interaction.handle.includes('e')) width = Math.max(minWidth, original.width + dx);
-      if (interaction.handle.includes('s')) height = Math.max(minHeight, original.height + dy);
-      if (interaction.handle.includes('w')) { width = Math.max(minWidth, original.width - dx); x = original.x + original.width - width; }
-      if (interaction.handle.includes('n')) { height = Math.max(minHeight, original.height - dy); y = original.y + original.height - height; }
-      if (event.shiftKey) {
-        const ratio = original.width / original.height;
-        if (Math.abs(dx) > Math.abs(dy)) height = width / ratio; else width = height * ratio;
-      }
-      const nodes = interaction.startDocument.nodes.map((node) => node.id === original.id ? { ...node, x, y, width, height, updatedAt: canvasNow() } : node);
+      const nodes = interaction.startDocument.nodes.map((node) => {
+        const original = interaction.startNodes.get(node.id);
+        if (!original) return node;
+        const minWidth = original.type === 'image' ? 80 : original.type === 'group' ? 180 : 140;
+        const minHeight = original.type === 'image' ? 80 : original.type === 'group' ? 120 : 70;
+        let { x, y, width, height } = original;
+        if (interaction.handle.includes('e')) width = Math.max(minWidth, original.width + dx);
+        if (interaction.handle.includes('s')) height = Math.max(minHeight, original.height + dy);
+        if (interaction.handle.includes('w')) { width = Math.max(minWidth, original.width - dx); x = original.x + original.width - width; }
+        if (interaction.handle.includes('n')) { height = Math.max(minHeight, original.height - dy); y = original.y + original.height - height; }
+        if (event.shiftKey) {
+          const ratio = original.width / original.height;
+          if (Math.abs(dx) > Math.abs(dy)) height = width / ratio; else width = height * ratio;
+        }
+        return { ...node, x, y, width, height, updatedAt: canvasNow() };
+      });
       setDocument({ ...interaction.startDocument, nodes }, false);
     }
   };
@@ -721,7 +783,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
         commit({ ...previous, edges: [...previous.edges, edge] }, previous);
         setSelection({ nodeIds: [], edgeId: null });
       }
-    } else if (interaction.type === 'dragging-nodes' || interaction.type === 'resizing-node') {
+    } else if (interaction.type === 'dragging-nodes' || interaction.type === 'resizing-nodes') {
       commit(documentRef.current, interaction.historyDocument || interaction.startDocument);
     } else if (interaction.type === 'panning') {
       suppressContextMenuRef.current = interaction.moved;
@@ -753,7 +815,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
       const modifier = event.ctrlKey || event.metaKey;
       if (modifier && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo(); return; }
       if (modifier && event.key.toLowerCase() === 'y') { event.preventDefault(); redo(); return; }
-      if (modifier && event.key.toLowerCase() === 'a') { event.preventDefault(); setSelection({ nodeIds: documentRef.current.nodes.map((node) => node.id), edgeId: null }); return; }
+      if (modifier && event.key.toLowerCase() === 'a') { event.preventDefault(); setSelection({ nodeIds: documentRef.current.nodes.map((node) => node.id), edgeIds: documentRef.current.edges.map((edge) => edge.id) }); return; }
       if (modifier && event.key.toLowerCase() === 'c') { event.preventDefault(); void copySelection(false); return; }
       if (modifier && event.key.toLowerCase() === 'x') { event.preventDefault(); void copySelection(true); return; }
       if (modifier && event.key.toLowerCase() === 'd') { event.preventDefault(); duplicateSelection(); return; }
@@ -761,8 +823,8 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
       if (event.shiftKey && event.key === '2') { event.preventDefault(); fitNodes(selection.nodeIds); return; }
       if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); removeSelection(); return; }
       if (event.key === 'Enter') {
-        if (selection.edgeId) {
-          const edge = documentRef.current.edges.find((item) => item.id === selection.edgeId);
+        if (selection.edgeIds.length === 1 && !selection.nodeIds.length) {
+          const edge = documentRef.current.edges.find((item) => item.id === selection.edgeIds[0]);
           const label = window.prompt('Rótulo da conexão:', edge?.label || '');
           if (label !== null && edge) commit({ ...documentRef.current, edges: documentRef.current.edges.map((item) => item.id === edge.id ? { ...item, label } : item) });
         } else if (selection.nodeIds.length === 1) setEditing({ type: 'node', id: selection.nodeIds[0] });
@@ -783,7 +845,8 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
 
   const selectedNodes = useMemo(() => documentState.nodes.filter((node) => selection.nodeIds.includes(node.id)), [documentState.nodes, selection.nodeIds]);
   const selectionBounds = getNodesBounds(selectedNodes);
-  const selectedEdge = documentState.edges.find((edge) => edge.id === selection.edgeId);
+  const selectedEdges = useMemo(() => documentState.edges.filter((edge) => selection.edgeIds.includes(edge.id)), [documentState.edges, selection.edgeIds]);
+  const selectedEdge = selectedEdges[0];
   const worldStyle = { transform: `translate(${documentState.viewport.x * documentState.viewport.zoom}px, ${documentState.viewport.y * documentState.viewport.zoom}px) scale(${documentState.viewport.zoom})`, transformOrigin: '0 0' };
   const lowDetail = documentState.viewport.zoom < 0.35;
   const selectionToolbarPosition = selectionBounds ? worldToScreen((selectionBounds.minX + selectionBounds.maxX) / 2, selectionBounds.minY, documentState.viewport) : null;
@@ -860,9 +923,10 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
             const path = getBezierPath(start, end, edge.fromSide, edge.toSide);
             const color = edge.color || NEUTRAL_COLOR;
             const center = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
-            return <g key={edge.id} data-edge-id={edge.id} className="cursor-pointer" onClick={(event) => { event.stopPropagation(); setSelection({ nodeIds: [], edgeId: edge.id }); }} onDoubleClick={(event) => { event.stopPropagation(); const label = window.prompt('Rótulo da conexão:', edge.label || ''); if (label !== null) commit({ ...documentRef.current, edges: documentRef.current.edges.map((item) => item.id === edge.id ? { ...item, label } : item) }); }}>
+            const isSelected = selection.edgeIds.includes(edge.id);
+            return <g key={edge.id} data-edge-id={edge.id} className="cursor-pointer" onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => { event.stopPropagation(); const label = window.prompt('Rótulo da conexão:', edge.label || ''); if (label !== null) commit({ ...documentRef.current, edges: documentRef.current.edges.map((item) => item.id === edge.id ? { ...item, label } : item) }); }}>
               <path d={path} fill="none" stroke="transparent" strokeWidth="16" />
-              <path d={path} fill="none" stroke={color} strokeWidth={selection.edgeId === edge.id ? 3 : 2} markerStart={edge.fromEnd === 'arrow' ? `url(#arrow-${color.replace('#', '')})` : undefined} markerEnd={edge.toEnd === 'arrow' ? `url(#arrow-${color.replace('#', '')})` : undefined} style={selection.edgeId === edge.id ? { filter: `drop-shadow(0 0 3px ${color})` } : undefined} />
+              <path d={path} fill="none" stroke={color} strokeWidth={isSelected ? 3 : 2} markerStart={edge.fromEnd === 'arrow' ? `url(#arrow-${color.replace('#', '')})` : undefined} markerEnd={edge.toEnd === 'arrow' ? `url(#arrow-${color.replace('#', '')})` : undefined} style={isSelected ? { filter: `drop-shadow(0 0 3px ${color})` } : undefined} />
               {edge.label ? <foreignObject x={center.x - 70} y={center.y - 14} width="140" height="28" className="pointer-events-none"><div className="truncate rounded-lg bg-[#101218e6] px-2 py-1 text-center text-xs text-white">{edge.label}</div></foreignObject> : null}
             </g>;
           })}

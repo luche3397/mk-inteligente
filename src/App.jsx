@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { CadastroPage, LoginPage } from './components/auth-page';
 import { HtmlViewer } from './components/html-viewer';
 import { QuadroCanvas } from './components/quadro-canvas';
@@ -140,6 +140,7 @@ function App() {
   const [isImportingData, setIsImportingData] = useState(false);
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [canvasFocusRequest, setCanvasFocusRequest] = useState(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [publicLibraryModules, setPublicLibraryModules] = useState([]);
   const [privateLibraryModules, setPrivateLibraryModules] = useState([]);
@@ -149,6 +150,76 @@ function App() {
   const [isPrivateLibraryUploading, setIsPrivateLibraryUploading] = useState(false);
   const [pendingImportModule, setPendingImportModule] = useState(null);
   const htmlModuleInputRef = useRef(null);
+
+  const mentionItems = useMemo(() => {
+    const items = [];
+    for (const workspaceItem of state.workspace) {
+      if (workspaceItem.type === 'title') {
+        items.push({
+          label: workspaceItem.title,
+          typeLabel: 'Título',
+          href: `workspace://title/${encodeURIComponent(workspaceItem.id)}`,
+        });
+        continue;
+      }
+      if (workspaceItem.type !== 'section') continue;
+      items.push({
+        label: workspaceItem.name,
+        typeLabel: 'Seção',
+        href: `workspace://section/${encodeURIComponent(workspaceItem.id)}`,
+      });
+      for (const tab of workspaceItem.tabs ?? []) {
+        for (const node of tab.canvasDocument?.nodes ?? []) {
+          const label = node.type === 'text'
+            ? node.text?.split('\n')[0]
+            : node.type === 'group'
+              ? node.group?.title
+              : node.type === 'link'
+                ? node.link?.title || node.link?.url
+                : node.caption || node.image?.alt;
+          items.push({
+            label: (label || `Card ${node.id.slice(0, 6)}`).slice(0, 80),
+            typeLabel: 'Card',
+            href: `workspace://card/${encodeURIComponent(workspaceItem.id)}/${encodeURIComponent(tab.id)}/${encodeURIComponent(node.id)}`,
+          });
+        }
+      }
+    }
+    return items;
+  }, [state.workspace]);
+
+  const handleOpenMention = (href) => {
+    const match = href.match(/^workspace:\/\/(title|section|card)\/(.+)$/);
+    if (!match) return;
+    const type = match[1];
+    const parts = match[2].split('/').map((part) => decodeURIComponent(part));
+    let sectionId = type === 'section' || type === 'card' ? parts[0] : null;
+
+    if (type === 'title') {
+      const titleIndex = state.workspace.findIndex((item) => item.type === 'title' && item.id === parts[0]);
+      let nextSection = null;
+      for (let index = titleIndex + 1; titleIndex >= 0 && index < state.workspace.length; index += 1) {
+        if (state.workspace[index].type === 'title') break;
+        if (state.workspace[index].type === 'section') {
+          nextSection = state.workspace[index];
+          break;
+        }
+      }
+      sectionId = nextSection?.id ?? null;
+    }
+
+    if (!sectionId) return;
+    setActiveView('workspace');
+    actions.selectSection(sectionId);
+    setIsMobileSidebarOpen(false);
+
+    if (type === 'card') {
+      const [, tabId, nodeId] = parts;
+      actions.setActiveTab(sectionId, tabId);
+      actions.updateTabContent(sectionId, tabId, { viewMode: 'quadro' });
+      setCanvasFocusRequest({ sectionId, tabId, nodeId, token: crypto.randomUUID() });
+    }
+  };
   const mkInputRef = useRef(null);
   const pdfInputRef = useRef(null);
   const publicLibraryInputRef = useRef(null);
@@ -862,6 +933,12 @@ function App() {
                 {activeTab.viewMode === 'quadro' ? (
                   <QuadroCanvas
                     documentValue={activeTab.canvasDocument ?? createDefaultCanvasDocument()}
+                    focusRequest={
+                      canvasFocusRequest?.sectionId === selectedSection.id && canvasFocusRequest?.tabId === activeTab.id
+                        ? canvasFocusRequest
+                        : null
+                    }
+                    onFocusRequestHandled={() => setCanvasFocusRequest(null)}
                     onChange={handleQuadroDocumentChange}
                     onExit={handleToggleQuadro}
                     onUploadImage={handleUploadQuadroImage}
@@ -871,9 +948,11 @@ function App() {
                     <MarkdownEditor
                       value={activeTab.content}
                       zoom={activeTab.noteZoom ?? 1}
+                      mentionItems={mentionItems}
                       onChange={(content) => updateCurrentTab({ content })}
                       onZoomChange={(noteZoom) => updateCurrentTab({ noteZoom })}
                       onUploadImage={handleUploadMkImage}
+                      onOpenMention={handleOpenMention}
                     />
                   </Suspense>
                 ) : activeTab.type === 'pdf' && activeTab.fileUrl ? (
