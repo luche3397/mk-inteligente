@@ -1,6 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { InlineEditable } from './inline-editable';
 
+const SIDEBAR_WIDTH_KEY = 'workspaceSidebarWidth';
+const SIDEBAR_MIN_WIDTH = 230;
+const SIDEBAR_MAX_WIDTH = 540;
+const SIDEBAR_DEFAULT_WIDTH = 340;
+
+const clampSidebarWidth = (value) => Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, value));
+
+const getInitialSidebarWidth = () => {
+  if (typeof window === 'undefined') return SIDEBAR_DEFAULT_WIDTH;
+  const storedWidth = Number(window.localStorage.getItem(SIDEBAR_WIDTH_KEY));
+  return Number.isFinite(storedWidth) && storedWidth > 0
+    ? clampSidebarWidth(storedWidth)
+    : SIDEBAR_DEFAULT_WIDTH;
+};
+
 export function Sidebar({
   workspace,
   selectedSectionId,
@@ -28,8 +43,11 @@ export function Sidebar({
   const [draggedItemId, setDraggedItemId] = useState(null);
   const [dragOverItemId, setDragOverItemId] = useState(null);
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(getInitialSidebarWidth);
+  const [isResizing, setIsResizing] = useState(false);
   const colorInputRefs = useRef({});
   const createMenuRef = useRef(null);
+  const resizeStateRef = useRef(null);
 
   useEffect(() => {
     if (!isCreateMenuOpen) return undefined;
@@ -48,6 +66,42 @@ export function Sidebar({
     };
   }, [isCreateMenuOpen]);
 
+  useEffect(() => {
+    if (!isResizing) return undefined;
+    const previousUserSelect = document.body.style.userSelect;
+    const previousCursor = document.body.style.cursor;
+
+    const handlePointerMove = (event) => {
+      const resizeState = resizeStateRef.current;
+      if (!resizeState || resizeState.pointerId !== event.pointerId) return;
+      const nextWidth = clampSidebarWidth(resizeState.startWidth + event.clientX - resizeState.startX);
+      resizeState.currentWidth = nextWidth;
+      setSidebarWidth(nextWidth);
+    };
+
+    const handlePointerEnd = (event) => {
+      const resizeState = resizeStateRef.current;
+      if (!resizeState || resizeState.pointerId !== event.pointerId) return;
+      window.localStorage.setItem(SIDEBAR_WIDTH_KEY, String(resizeState.currentWidth));
+      resizeStateRef.current = null;
+      setIsResizing(false);
+    };
+
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerEnd);
+    window.addEventListener('pointercancel', handlePointerEnd);
+
+    return () => {
+      document.body.style.userSelect = previousUserSelect;
+      document.body.style.cursor = previousCursor;
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerEnd);
+      window.removeEventListener('pointercancel', handlePointerEnd);
+    };
+  }, [isResizing]);
+
   const runCreateAction = (action) => {
     action();
     setIsCreateMenuOpen(false);
@@ -60,10 +114,24 @@ export function Sidebar({
     else onDeleteSection(item.id);
   };
 
+  const handleResizeStart = (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    resizeStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth: sidebarWidth,
+      currentWidth: sidebarWidth,
+    };
+    setIsResizing(true);
+  };
+
   return (
     <aside
       data-sidebar-shell
-      className={`fixed inset-y-0 left-0 z-[80] flex h-full w-[min(88vw,340px)] flex-col border-r border-[#2a2f3a] bg-[#1a1d23]/98 transition-transform duration-150 md:static md:z-auto md:w-[340px] md:min-w-[340px] md:translate-x-0 ${
+      data-resizing={isResizing}
+      style={{ '--sidebar-width': `${sidebarWidth}px` }}
+      className={`fixed inset-y-0 left-0 z-[80] flex h-full flex-col border-r border-[#2a2f3a] bg-[#1a1d23]/98 transition-transform duration-150 md:relative md:z-auto md:translate-x-0 ${
         isMobileOpen ? 'translate-x-0' : '-translate-x-full'
       }`}
     >
@@ -104,6 +172,40 @@ export function Sidebar({
           </div>
         </div>
       </div>
+
+      <nav data-sidebar-actions aria-label="Ações do workspace" className="border-b border-[#2a2f3a] px-2 py-2">
+        <button
+          type="button"
+          onClick={onSaveChanges}
+          disabled={syncStatus === 'saving' || !hasUnsavedChanges}
+          data-unsaved={hasUnsavedChanges}
+          className="flex h-9 w-full items-center gap-2.5 border border-transparent px-2.5 text-left text-xs font-medium transition duration-150 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+            <path d="M5 4h12l2 2v14H5z" /><path d="M8 4v6h8V4M8 20v-6h8v6" />
+          </svg>
+          <span>{syncStatus === 'saving' ? 'Salvando...' : 'Salvar alterações'}</span>
+          <span className="ml-auto text-[10px] font-normal text-[#8C8A85]">{hasUnsavedChanges ? 'Pendente' : 'Salvo'}</span>
+        </button>
+        <button type="button" onClick={onOpenPrivateLibrary} data-active={isPrivateLibraryActive} className="flex h-9 w-full items-center gap-2.5 border border-transparent px-2.5 text-left text-xs font-medium transition duration-150">
+          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+            <path d="M3.5 7.5h6l2-2h9v14h-17z" /><rect x="9" y="11" width="6" height="5" /><path d="M10.5 11V9.8a1.5 1.5 0 0 1 3 0V11" />
+          </svg>
+          <span>Biblioteca Privada</span>
+        </button>
+        <button type="button" onClick={onOpenPublicLibrary} data-active={isPublicLibraryActive} className="flex h-9 w-full items-center gap-2.5 border border-transparent px-2.5 text-left text-xs font-medium transition duration-150">
+          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+            <path d="M4 5.5h6.5A2.5 2.5 0 0 1 13 8v11H6a2 2 0 0 0-2 2z" /><path d="M20 5.5h-4.5A2.5 2.5 0 0 0 13 8v11h5a2 2 0 0 1 2 2z" />
+          </svg>
+          <span>Biblioteca Pública</span>
+        </button>
+        <button type="button" onClick={onLogout} disabled={isLoggingOut} className="flex h-9 w-full items-center gap-2.5 border border-transparent px-2.5 text-left text-xs font-medium transition duration-150 disabled:cursor-not-allowed disabled:opacity-45">
+          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+            <path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" />
+          </svg>
+          <span>{isLoggingOut ? 'Saindo...' : 'Sair'}</span>
+        </button>
+      </nav>
 
       <div className="flex-1 overflow-y-auto px-2 py-2.5">
         {workspace.length === 0 ? (
@@ -207,36 +309,17 @@ export function Sidebar({
         )}
       </div>
 
-      <div data-sidebar-footer className="border-t border-[#2a2f3a] px-2.5 py-2.5">
-        <div className="mb-2 flex items-center justify-between gap-2 px-1">
-          <button
-            type="button"
-            onClick={onSaveChanges}
-            disabled={syncStatus === 'saving' || !hasUnsavedChanges}
-            data-unsaved={hasUnsavedChanges}
-            data-ui-variant="primary"
-            className="border px-2.5 py-1.5 text-xs font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {syncStatus === 'saving' ? 'Salvando...' : 'Salvar alteracoes'}
-          </button>
-          <span className="text-[10px] text-[#8C8A85]">{hasUnsavedChanges ? 'Pendente' : 'Salvo'}</span>
-        </div>
-
-        <button type="button" onClick={onOpenPrivateLibrary} data-active={isPrivateLibraryActive} className="w-full border border-transparent px-2.5 py-2 text-left text-xs font-medium transition duration-150">
-          Biblioteca Privada
-        </button>
-        <button type="button" onClick={onOpenPublicLibrary} data-active={isPublicLibraryActive} className="w-full border border-transparent px-2.5 py-2 text-left text-xs font-medium transition duration-150">
-          Biblioteca Publica
-        </button>
-        <button
-          type="button"
-          onClick={onLogout}
-          disabled={isLoggingOut}
-          className="mt-1 w-full border-x-0 border-b-0 border-t border-[#2a2f3a] px-2.5 py-2.5 text-left text-xs font-medium text-white transition duration-150 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isLoggingOut ? 'Saindo...' : 'Sair'}
-        </button>
-      </div>
+      <div
+        data-sidebar-resizer
+        role="separator"
+        aria-label="Redimensionar sidebar"
+        aria-orientation="vertical"
+        aria-valuemin={SIDEBAR_MIN_WIDTH}
+        aria-valuemax={SIDEBAR_MAX_WIDTH}
+        aria-valuenow={Math.round(sidebarWidth)}
+        onPointerDown={handleResizeStart}
+        className="absolute inset-y-0 -right-[3px] z-20 hidden w-1.5 cursor-col-resize touch-none md:block"
+      />
     </aside>
   );
 }

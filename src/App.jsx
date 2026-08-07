@@ -730,7 +730,7 @@ function App() {
         <div className="min-h-0 flex-1 overflow-hidden p-1.5 sm:p-2">
           {activeTab ? (
             <div data-workspace-container className="flex h-full min-h-0 flex-col overflow-hidden border border-[#2a2f3a] bg-white/[0.025]">
-              <div data-context-toolbar className="flex min-h-11 items-center gap-2 overflow-x-auto border-b border-[#2a2f3a] px-2.5 py-1 xl:overflow-visible">
+              <div data-context-toolbar className="flex min-h-10 items-center gap-2 overflow-x-auto border-b border-[#2a2f3a] px-2.5 xl:overflow-visible">
                 <div className="flex min-w-0 shrink-0 items-center gap-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <h3 className="max-w-[160px] truncate text-sm font-semibold text-white sm:max-w-[220px]">{activeTab.name}</h3>
@@ -743,21 +743,7 @@ function App() {
                           ? 'PDF'
                           : 'HTML'}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateCurrentTab({
-                          status: getNextStatus(activeTab.status),
-                        })
-                      }
-                      className="border border-[#3a404d] px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.16em] text-[#d4d4d8] transition duration-150"
-                    >
-                      {getStatusLabel(activeTab.status)}
-                    </button>
                   </div>
-                  <p className="max-w-[180px] truncate text-[10px] text-[#8f95a3] sm:max-w-[280px]">
-                    {[selectedTitle?.title, selectedSection.name].filter(Boolean).join(' / ')}
-                  </p>
                 </div>
 
                 <div className="ml-auto flex shrink-0 items-center gap-0.5">
@@ -818,14 +804,6 @@ function App() {
                     className="h-8 shrink-0 border border-transparent px-2.5 text-xs font-medium text-white transition duration-150"
                   >
                     Novo MK
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => activeTab && actions.duplicateTab(selectedSection.id, activeTab.id)}
-                    data-ui-variant="secondary"
-                    className="h-8 shrink-0 border border-transparent px-2.5 text-xs font-medium text-white transition duration-150"
-                  >
-                    Duplicar
                   </button>
                   <div ref={importMenuRef} className="relative shrink-0">
                     <button
