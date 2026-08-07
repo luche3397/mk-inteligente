@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "client-control-dashboard",
+  "name": "my",
   "compatibility_date": "2026-08-07",
   "observability": {
     "enabled": true
