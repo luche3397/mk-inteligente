@@ -615,6 +615,29 @@ function App() {
     return { url: data.publicUrl, path };
   };
 
+  const handleUploadMkImage = async (file) => {
+    if (!user?.id) {
+      throw new Error('Usuario nao autenticado.');
+    }
+
+    const safeName = sanitizeFileName(file.name || 'imagem.png');
+    const path = `${user.id}/mk/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
+    const { error } = await supabase.storage.from('modules').upload(path, file, {
+      cacheControl: '3600',
+      contentType: file.type,
+      upsert: false,
+    });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage.from('modules').getPublicUrl(path);
+    if (!data?.publicUrl) {
+      throw new Error('Nao foi possivel gerar o endereco da imagem.');
+    }
+
+    return { url: data.publicUrl, path };
+  };
+
   const handleLogout = async () => {
     setIsLoggingOut(true);
 
@@ -867,6 +890,7 @@ function App() {
                       zoom={activeTab.noteZoom ?? 1}
                       onChange={(content) => updateCurrentTab({ content })}
                       onZoomChange={(noteZoom) => updateCurrentTab({ noteZoom })}
+                      onUploadImage={handleUploadMkImage}
                     />
                   </Suspense>
                 ) : activeTab.type === 'pdf' && activeTab.fileUrl ? (

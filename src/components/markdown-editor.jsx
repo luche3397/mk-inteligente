@@ -1,12 +1,14 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { applyMarkdownLinePrefix, applyMarkdownWrap, insertMarkdownAtSelection } from '../utils/markdown';
 
 const ToolbarButton = ({ children, title, onClick }) => (
   <button
     type="button"
     title={title}
     aria-label={title}
+    onMouseDown={(event) => event.preventDefault()}
     onClick={onClick}
     className="h-8 min-w-8 border border-[#5A5853] px-2 text-xs font-semibold"
   >
@@ -14,42 +16,78 @@ const ToolbarButton = ({ children, title, onClick }) => (
   </button>
 );
 
-export function MarkdownEditor({ value, zoom = 1, onChange, onZoomChange }) {
+export function MarkdownEditor({ value, zoom = 1, onChange, onZoomChange, onUploadImage }) {
   const textareaRef = useRef(null);
-  const [mode, setMode] = useState('edit');
+  const valueRef = useRef(value);
+  const [mode, setMode] = useState('split');
+  const [uploadingImages, setUploadingImages] = useState(0);
 
-  const updateSelection = (builder) => {
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
+  const emitChange = (nextValue) => {
+    valueRef.current = nextValue;
+    onChange(nextValue);
+  };
+
+  const applySelectionResult = (result) => {
     const textarea = textareaRef.current;
-    if (!textarea) return;
+    if (!textarea || !result) return;
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selected = value.slice(start, end);
-    const result = builder({ selected, start, end });
-    onChange(`${value.slice(0, start)}${result.text}${value.slice(end)}`);
-
+    emitChange(result.value);
     window.requestAnimationFrame(() => {
       textarea.focus();
-      textarea.setSelectionRange(start + result.selectionStart, start + result.selectionEnd);
+      textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
     });
   };
 
-  const wrap = (prefix, suffix = prefix, placeholder = 'texto') =>
-    updateSelection(({ selected }) => {
-      const content = selected || placeholder;
-      return {
-        text: `${prefix}${content}${suffix}`,
-        selectionStart: prefix.length,
-        selectionEnd: prefix.length + content.length,
-      };
-    });
+  const wrap = (prefix, suffix = prefix, placeholder = 'texto') => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    applySelectionResult(
+      applyMarkdownWrap(valueRef.current, textarea.selectionStart, textarea.selectionEnd, prefix, suffix, placeholder),
+    );
+  };
 
-  const prefixLines = (prefix, placeholder = 'Item') =>
-    updateSelection(({ selected }) => {
-      const content = selected || placeholder;
-      const text = content.split('\n').map((line) => `${prefix}${line}`).join('\n');
-      return { text, selectionStart: prefix.length, selectionEnd: text.length };
-    });
+  const prefixLines = (prefix, placeholder = 'Item') => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    applySelectionResult(
+      applyMarkdownLinePrefix(valueRef.current, textarea.selectionStart, textarea.selectionEnd, prefix, placeholder),
+    );
+  };
+
+  const insertImage = async (file, selectionStart, selectionEnd) => {
+    if (!onUploadImage) return;
+
+    const imageName = file.name?.replace(/\.[^.]+$/, '') || 'imagem';
+    const placeholder = `![Enviando ${imageName}...](mk-upload:${crypto.randomUUID()})`;
+    const insertion = insertMarkdownAtSelection(valueRef.current, selectionStart, selectionEnd, placeholder);
+    emitChange(insertion.value);
+    setUploadingImages((current) => current + 1);
+
+    try {
+      const uploaded = await onUploadImage(file);
+      emitChange(valueRef.current.replace(placeholder, `![${imageName}](${uploaded.url})`));
+    } catch (error) {
+      emitChange(valueRef.current.replace(placeholder, ''));
+      window.alert(`Nao foi possivel colar a imagem no documento MK.\n\n${error?.message ?? ''}`.trim());
+    } finally {
+      setUploadingImages((current) => Math.max(0, current - 1));
+    }
+  };
+
+  const handlePaste = (event) => {
+    const imageItem = Array.from(event.clipboardData?.items ?? []).find((item) => item.type.startsWith('image/'));
+    if (!imageItem) return;
+
+    const file = imageItem.getAsFile();
+    if (!file) return;
+
+    event.preventDefault();
+    void insertImage(file, event.currentTarget.selectionStart, event.currentTarget.selectionEnd);
+  };
 
   const handleWheel = (event) => {
     if (!event.ctrlKey) return;
@@ -61,14 +99,15 @@ export function MarkdownEditor({ value, zoom = 1, onChange, onZoomChange }) {
   return (
     <div className="flex h-full min-h-0 w-full flex-col border border-[#5A5853] bg-[#1F1E1D]" onWheel={handleWheel}>
       <div className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-[#5A5853] bg-[#2D2C2B] p-2">
-        <ToolbarButton title="Título" onClick={() => prefixLines('## ', 'Título')}>H</ToolbarButton>
+        <ToolbarButton title="Titulo principal" onClick={() => prefixLines('# ', 'Titulo')}>H</ToolbarButton>
         <ToolbarButton title="Negrito" onClick={() => wrap('**', '**', 'negrito')}>B</ToolbarButton>
-        <ToolbarButton title="Itálico" onClick={() => wrap('_', '_', 'itálico')}><em>I</em></ToolbarButton>
+        <ToolbarButton title="Italico" onClick={() => wrap('*', '*', 'italico')}><em>I</em></ToolbarButton>
         <ToolbarButton title="Lista" onClick={() => prefixLines('- ')}>•</ToolbarButton>
         <ToolbarButton title="Checklist" onClick={() => prefixLines('- [ ] ')}>☐</ToolbarButton>
-        <ToolbarButton title="Citação" onClick={() => prefixLines('> ', 'Citação')}>“</ToolbarButton>
-        <ToolbarButton title="Código" onClick={() => wrap('`', '`', 'código')}>&lt;/&gt;</ToolbarButton>
+        <ToolbarButton title="Citacao" onClick={() => prefixLines('> ', 'Citacao')}>“</ToolbarButton>
+        <ToolbarButton title="Codigo" onClick={() => wrap('`', '`', 'codigo')}>&lt;/&gt;</ToolbarButton>
         <ToolbarButton title="Link" onClick={() => wrap('[', '](https://)', 'texto do link')}>↗</ToolbarButton>
+        {uploadingImages ? <span className="px-2 text-xs text-[#8C8A85]">Enviando imagem...</span> : null}
 
         <div className="ml-auto flex shrink-0 items-center gap-1">
           <button type="button" aria-pressed={mode === 'edit'} onClick={() => setMode('edit')} className="h-8 border border-[#5A5853] px-3 text-xs">Editar</button>
@@ -82,8 +121,9 @@ export function MarkdownEditor({ value, zoom = 1, onChange, onZoomChange }) {
           <textarea
             ref={textareaRef}
             value={value}
-            onChange={(event) => onChange(event.target.value)}
-            placeholder="# Título\n\nEscreva seu documento em Markdown..."
+            onChange={(event) => emitChange(event.target.value)}
+            onPaste={handlePaste}
+            placeholder="# Titulo\n\nEscreva seu documento em Markdown ou cole uma imagem..."
             spellCheck
             className={`h-full min-h-0 w-full resize-none overflow-auto bg-[#1F1E1D] px-5 py-5 font-mono outline-none ${mode === 'split' ? 'border-r border-[#5A5853]' : ''}`}
             style={{ fontSize: `${15 * zoom}px`, lineHeight: 1.7, overflowAnchor: 'none' }}
@@ -102,7 +142,7 @@ export function MarkdownEditor({ value, zoom = 1, onChange, onZoomChange }) {
                 {value}
               </ReactMarkdown>
             ) : (
-              <p>O documento MK está vazio.</p>
+              <p>O documento MK esta vazio.</p>
             )}
           </article>
         ) : null}

@@ -302,6 +302,14 @@ aside {
   accent-color: var(--editorial-text);
 }
 
+.mk-preview img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1em 0;
+  border: 1px solid var(--editorial-border);
+}
+
 button,
 aside,
 section,
