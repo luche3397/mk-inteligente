@@ -7,7 +7,7 @@ const applyButtonStyles = (buttonEl) => {
   buttonEl.style.top = '8px';
   buttonEl.style.right = '8px';
   buttonEl.style.zIndex = '10';
-  buttonEl.style.border = '1px solid #3A3936';
+  buttonEl.style.border = '1px solid #5A5853';
   buttonEl.style.borderRadius = '8px';
   buttonEl.style.background = '#2D2C2B';
   buttonEl.style.color = '#8C8A85';
@@ -98,7 +98,7 @@ const openExpandOverlay = (descriptor) => {
   boxEl.style.height = '88vh';
   boxEl.style.overflow = 'hidden';
   boxEl.style.borderRadius = '0';
-  boxEl.style.border = '1px solid #3A3936';
+  boxEl.style.border = '1px solid #5A5853';
   boxEl.style.background = '#2D2C2B';
 
   const closeButtonEl = document.createElement('button');
@@ -109,7 +109,7 @@ const openExpandOverlay = (descriptor) => {
   closeButtonEl.style.top = '12px';
   closeButtonEl.style.right = '12px';
   closeButtonEl.style.zIndex = '1';
-  closeButtonEl.style.border = '1px solid #3A3936';
+  closeButtonEl.style.border = '1px solid #5A5853';
   closeButtonEl.style.borderRadius = '0';
   closeButtonEl.style.background = '#2D2C2B';
   closeButtonEl.style.color = '#ECEBE8';

@@ -1,22 +1,6 @@
 import { useRef, useState } from 'react';
 import { InlineEditable } from './inline-editable';
 
-const toMonochromeColor = (value) => {
-  const match = /^#([0-9a-f]{6})$/i.exec(value ?? '');
-  if (!match) return '#ECEBE8';
-
-  const red = Number.parseInt(match[1].slice(0, 2), 16);
-  const green = Number.parseInt(match[1].slice(2, 4), 16);
-  const blue = Number.parseInt(match[1].slice(4, 6), 16);
-  const luminance = red * 0.2126 + green * 0.7152 + blue * 0.0722;
-
-  if (luminance >= 205) return '#ECEBE8';
-  if (luminance >= 150) return '#B8B6B0';
-  if (luminance >= 95) return '#8C8A85';
-  if (luminance >= 50) return '#5F5D59';
-  return '#3A3936';
-};
-
 export function Sidebar({
   workspace,
   selectedSectionId,
@@ -150,7 +134,7 @@ export function Sidebar({
                       item.type === 'title' ? 'text-sm font-semibold' : 'text-sm font-medium text-white'
                     }`}
                     inputClassName="w-full rounded-lg border border-[#3a404d] bg-[#0f1115] px-2 py-1 text-sm text-white"
-                    style={item.type === 'title' ? { color: toMonochromeColor(item.color) } : undefined}
+                    style={item.type === 'title' ? { color: item.color } : undefined}
                   />
 
                   {item.type === 'title' ? (
@@ -160,8 +144,8 @@ export function Sidebar({
                           colorInputRefs.current[item.id] = element;
                         }}
                         type="color"
-                        value={toMonochromeColor(item.color)}
-                        onChange={(event) => onUpdateTitleColor(item.id, toMonochromeColor(event.target.value))}
+                        value={item.color}
+                        onChange={(event) => onUpdateTitleColor(item.id, event.target.value)}
                         className="sr-only"
                         tabIndex={-1}
                         aria-hidden="true"

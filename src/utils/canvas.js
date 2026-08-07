@@ -9,6 +9,7 @@ export const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 export const createCanvasDocument = () => ({
   version: 1,
   viewport: { x: 0, y: 0, zoom: 1 },
+  favoriteColors: [],
   nodes: [],
   edges: [],
 });
@@ -41,6 +42,13 @@ export const createCanvasNode = (type, x, y, data = {}) => {
 };
 
 const finite = (value, fallback) => (Number.isFinite(value) ? value : fallback);
+
+export const normalizeCanvasColors = (value) =>
+  [...new Set(
+    (Array.isArray(value) ? value : [])
+      .filter((color) => typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color))
+      .map((color) => color.toUpperCase()),
+  )].slice(0, 16);
 
 export const normalizeCanvasDocument = (value) => {
   if (!value || typeof value !== 'object') return createCanvasDocument();
@@ -86,6 +94,7 @@ export const normalizeCanvasDocument = (value) => {
 
   return {
     version: 1,
+    favoriteColors: normalizeCanvasColors(value.favoriteColors),
     viewport: {
       x: finite(viewport.x, 0),
       y: finite(viewport.y, 0),

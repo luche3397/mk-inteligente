@@ -9,6 +9,7 @@ import {
   getBezierPath,
   getNodesBounds,
   nodesInSelection,
+  normalizeCanvasColors,
   normalizeCanvasDocument,
   screenToWorld,
   serializeCanvasDocument,
@@ -62,13 +63,18 @@ test('excluir nó remove suas conexões', () => {
 
 test('serializa, desserializa e valida o documento', () => {
   const node = createCanvasNode('link', 10, 20, { link: { url: 'https://example.com' } });
-  const documentValue = { ...createCanvasDocument(), viewport: { x: 4, y: 5, zoom: 1.5 }, nodes: [node] };
+  const documentValue = { ...createCanvasDocument(), favoriteColors: ['#ff00aa'], viewport: { x: 4, y: 5, zoom: 1.5 }, nodes: [node] };
   const restored = deserializeCanvasDocument(serializeCanvasDocument(documentValue));
   assert.equal(restored.nodes[0].id, node.id);
   assert.deepEqual(restored.viewport, documentValue.viewport);
+  assert.deepEqual(restored.favoriteColors, ['#FF00AA']);
   const invalid = normalizeCanvasDocument({ viewport: { zoom: 99 }, nodes: [{ type: 'script' }], edges: [] });
   assert.equal(invalid.viewport.zoom, 3);
   assert.equal(invalid.nodes.length, 0);
+});
+
+test('normaliza cores favoritas e remove duplicadas ou inválidas', () => {
+  assert.deepEqual(normalizeCanvasColors(['#ff00aa', '#FF00AA', 'red', '#123456']), ['#FF00AA', '#123456']);
 });
 
 test('gera curva Bézier válida', () => {

@@ -12,7 +12,7 @@
   --editorial-surface: #2d2c2b;
   --editorial-text: #ecebe8;
   --editorial-muted: #8c8a85;
-  --editorial-border: #3a3936;
+  --editorial-border: #5a5853;
   --editorial-hover: #3d3c3a;
 }
 
@@ -110,6 +110,19 @@ input,
 textarea,
 select {
   background-color: var(--editorial-surface) !important;
+}
+
+input[type="color"] {
+  padding: 0 !important;
+  background-color: transparent !important;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+input[type="color"]::-webkit-color-swatch {
+  border: 0;
 }
 
 iframe {

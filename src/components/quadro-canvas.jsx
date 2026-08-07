@@ -23,8 +23,8 @@ import {
   worldToScreen,
 } from '../utils/canvas';
 
-const COLORS = [null, '#ECEBE8', '#B8B6B0', '#8C8A85', '#5F5D59', '#3A3936'];
-const NEUTRAL_COLOR = '#8C8A85';
+const COLORS = [null, '#7C83FF', '#2DD4BF', '#F59E0B', '#F472B6', '#EF4444'];
+const NEUTRAL_COLOR = '#8B8B8B';
 const SIDES = ['top', 'right', 'bottom', 'left'];
 const RESIZE_HANDLES = ['nw', 'ne', 'se', 'sw'];
 const CLIPBOARD_PREFIX = 'workspace-quadro:';
@@ -262,6 +262,17 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
   const [imagePreview, setImagePreview] = useState(null);
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
   const [isColorPaletteOpen, setIsColorPaletteOpen] = useState(false);
+  const [customColor, setCustomColor] = useState('#7C83FF');
+
+  const markerColors = useMemo(
+    () => [...new Set([
+      ...COLORS.filter(Boolean),
+      NEUTRAL_COLOR,
+      ...(documentState.favoriteColors ?? []),
+      ...documentState.edges.map((edge) => edge.color).filter(Boolean),
+    ])],
+    [documentState.edges, documentState.favoriteColors],
+  );
 
   const setDocument = useCallback((nextDocument, persist = false) => {
     const normalized = normalizeCanvasDocument(nextDocument);
@@ -413,12 +424,23 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
     }, true);
   };
 
-  const changeSelectionColor = (color) => {
+  const changeSelectionColor = (color, closePalette = true) => {
     const previous = documentRef.current;
     const nodes = previous.nodes.map((node) => selection.nodeIds.includes(node.id) ? { ...node, color: color || undefined, updatedAt: canvasNow() } : node);
     const edges = previous.edges.map((edge) => edge.id === selection.edgeId ? { ...edge, color: color || undefined } : edge);
     commit({ ...previous, nodes, edges }, previous);
-    setIsColorPaletteOpen(false);
+    if (closePalette) setIsColorPaletteOpen(false);
+  };
+
+  const addFavoriteColor = () => {
+    const color = customColor.toUpperCase();
+    const favoriteColors = [...new Set([...(documentRef.current.favoriteColors ?? []), color])].slice(-16);
+    commit({ ...documentRef.current, favoriteColors }, documentRef.current);
+  };
+
+  const removeFavoriteColor = (color) => {
+    const favoriteColors = (documentRef.current.favoriteColors ?? []).filter((item) => item !== color);
+    commit({ ...documentRef.current, favoriteColors }, documentRef.current);
   };
 
   const copySelection = async (cut = false) => {
@@ -827,7 +849,7 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
 
         <svg className="absolute left-0 top-0 overflow-visible" width="1" height="1" aria-label="Conexões do quadro">
           <defs>
-            {COLORS.filter(Boolean).concat([NEUTRAL_COLOR]).map((color) => <marker key={color} id={`arrow-${color.replace('#', '')}`} markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill={color} /></marker>)}
+            {markerColors.map((color) => <marker key={color} id={`arrow-${color.replace('#', '')}`} markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill={color} /></marker>)}
           </defs>
           {documentState.edges.map((edge) => {
             const from = documentState.nodes.find((node) => node.id === edge.fromNode);
@@ -868,8 +890,27 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m14.7 5.3 4 4M4 20l4.5-1 10.2-10.2a2.1 2.1 0 0 0-3-3L5.5 16 4 20Z" /><path d="M3 3h6v6H3z" /></svg>
             </ContextIconButton>
             {isColorPaletteOpen ? (
-              <div className="absolute left-1/2 top-full mt-2 flex -translate-x-1/2 items-center gap-1.5 border border-[#3A3936] bg-[#2D2C2B] p-2">
-                {COLORS.map((color) => <button key={color || 'none'} type="button" data-color-swatch title={color ? 'Aplicar tom' : 'Remover tom'} aria-label={color ? `Tom ${color}` : 'Sem tom'} onClick={() => changeSelectionColor(color)} className="h-6 w-6 border border-[#3A3936] transition" style={{ '--swatch-color': color || NEUTRAL_COLOR }} />)}
+              <div className="absolute left-1/2 top-full mt-2 flex w-72 -translate-x-1/2 flex-wrap items-center gap-1.5 border border-[#5A5853] bg-[#2D2C2B] p-2">
+                {COLORS.map((color) => <button key={color || 'none'} type="button" data-color-swatch title={color ? 'Aplicar cor' : 'Remover cor'} aria-label={color ? `Cor ${color}` : 'Sem cor'} onClick={() => changeSelectionColor(color)} className="h-6 w-6 border border-[#5A5853] transition" style={{ '--swatch-color': color || NEUTRAL_COLOR }} />)}
+                {(documentState.favoriteColors ?? []).map((color) => (
+                  <span key={color} className="relative block h-6 w-6">
+                    <button type="button" data-color-swatch title={`Aplicar favorita ${color}`} aria-label={`Aplicar favorita ${color}`} onClick={() => changeSelectionColor(color)} className="h-6 w-6 border border-[#5A5853]" style={{ '--swatch-color': color }} />
+                    <button type="button" title={`Remover ${color} dos favoritos`} aria-label={`Remover ${color} dos favoritos`} onClick={() => removeFavoriteColor(color)} className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center border border-[#5A5853] p-0 text-[9px] leading-none">×</button>
+                  </span>
+                ))}
+                <input
+                  type="color"
+                  value={customColor}
+                  title="Escolher uma cor personalizada"
+                  aria-label="Escolher uma cor personalizada"
+                  onChange={(event) => {
+                    const color = event.target.value.toUpperCase();
+                    setCustomColor(color);
+                    changeSelectionColor(color, false);
+                  }}
+                  className="h-6 w-8 cursor-pointer border border-[#5A5853] p-0"
+                />
+                <button type="button" onClick={addFavoriteColor} title="Adicionar cor aos favoritos" aria-label="Adicionar cor aos favoritos" className="h-6 border border-[#5A5853] px-2 text-xs">☆</button>
               </div>
             ) : null}
           </div>
