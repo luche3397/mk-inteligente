@@ -714,7 +714,7 @@ function App() {
     if (!selectedSection) return renderEmptySection();
 
     return (
-      <div className="flex h-full min-h-0 flex-col">
+      <div data-workspace-shell className="flex h-full min-h-0 flex-col">
         <TabBar
           tabs={selectedSection.tabs}
           activeTabId={activeTab?.id ?? null}
@@ -729,7 +729,7 @@ function App() {
 
         <div className="min-h-0 flex-1 overflow-hidden p-2 sm:p-3">
           {activeTab ? (
-            <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-[#2a2f3a] bg-white/[0.045] shadow-[0_24px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl sm:rounded-[30px]">
+            <div data-workspace-container className="flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-[#2a2f3a] bg-white/[0.045] shadow-[0_24px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl sm:rounded-[30px]">
               <div className="flex items-center gap-2 overflow-x-auto border-b border-[#2a2f3a] px-3 py-1.5 sm:px-4 xl:overflow-visible">
                 <div className="flex shrink-0 items-center gap-2">
                   <div className="flex min-w-0 items-center gap-2">
@@ -1015,7 +1015,7 @@ function App() {
           onLogout={handleLogout}
         />
 
-        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+        <main data-main-shell className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
           {activeView !== 'workspace' || !selectedSection ? (
             <button
               type="button"

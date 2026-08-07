@@ -44,11 +44,12 @@ export function Sidebar({
 
   return (
     <aside
+      data-sidebar-shell
       className={`fixed inset-y-0 left-0 z-[80] flex h-full w-[min(88vw,340px)] flex-col border-r border-[#2a2f3a] bg-[#1a1d23]/98 shadow-2xl backdrop-blur-2xl transition-transform duration-200 md:static md:z-auto md:w-[340px] md:min-w-[340px] md:translate-x-0 md:shadow-none ${
         isMobileOpen ? 'translate-x-0' : '-translate-x-full'
       }`}
     >
-      <div className="sticky top-0 z-10 border-b border-[#2a2f3a] bg-[#1a1d23]/95 px-5 py-5 backdrop-blur-xl">
+      <div data-sidebar-structure className="sticky top-0 z-10 border-b border-[#2a2f3a] bg-[#1a1d23]/95 px-5 py-5 backdrop-blur-xl">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#a1a1aa]">Workspace</p>
           <button

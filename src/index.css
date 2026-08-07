@@ -170,6 +170,20 @@ aside {
   background-color: rgba(26, 25, 24, 0.92) !important;
 }
 
+#root [data-sidebar-shell],
+#root [data-sidebar-structure] {
+  background-color: var(--editorial-sidebar) !important;
+  background-image: none !important;
+}
+
+#root [data-main-shell],
+#root [data-workspace-shell],
+#root [data-workspace-tabs],
+#root [data-workspace-container] {
+  background-color: var(--editorial-main) !important;
+  background-image: none !important;
+}
+
 #root [class*="text-[#"] {
   color: var(--editorial-muted) !important;
 }

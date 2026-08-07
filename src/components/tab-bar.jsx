@@ -28,7 +28,7 @@ export function TabBar({
   };
 
   return (
-    <div className="border-b border-[#2a2f3a] bg-white/[0.02] px-2 py-1.5 sm:px-4 sm:py-2">
+    <div data-workspace-tabs className="border-b border-[#2a2f3a] bg-white/[0.02] px-2 py-1.5 sm:px-4 sm:py-2">
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         <button
           type="button"
