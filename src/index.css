@@ -652,6 +652,87 @@ aside {
   accent-color: var(--editorial-text);
 }
 
+.ai-markdown {
+  color: var(--editorial-text);
+  font-size: 0.875rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.ai-markdown p {
+  margin: 0.35rem 0;
+  color: var(--editorial-text);
+}
+
+.ai-markdown h1,
+.ai-markdown h2,
+.ai-markdown h3,
+.ai-markdown h4 {
+  margin: 0.9rem 0 0.35rem;
+  color: var(--editorial-text);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.ai-markdown h1 {
+  font-size: 1.25rem;
+}
+
+.ai-markdown h2 {
+  font-size: 1.1rem;
+}
+
+.ai-markdown strong {
+  font-weight: 700;
+}
+
+.ai-markdown code {
+  border: 1px solid var(--editorial-border-subtle);
+  background: var(--editorial-surface);
+  padding: 0.08rem 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.ai-markdown pre {
+  margin: 0.65rem 0;
+  overflow-x: auto;
+  border: 1px solid var(--editorial-border);
+  background: var(--editorial-surface);
+  padding: 0.75rem;
+}
+
+.ai-markdown pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  white-space: pre;
+}
+
+.ai-markdown a {
+  text-decoration: underline;
+}
+
+.ai-markdown blockquote {
+  margin: 0.55rem 0;
+  border-left: 2px solid var(--editorial-border);
+  padding-left: 0.7rem;
+  color: var(--editorial-muted);
+}
+
+.ai-markdown-list {
+  display: grid;
+  grid-template-columns: 1.1rem minmax(0, 1fr);
+  gap: 0.25rem;
+  margin: 0.2rem 0;
+}
+
+@media (max-width: 767px) {
+  [data-ai-panel] {
+    width: 100vw !important;
+  }
+}
+
 button,
 aside,
 section,

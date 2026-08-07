@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { CadastroPage, LoginPage } from './components/auth-page';
+import { AiPanel } from './components/ai-panel';
 import { HtmlViewer } from './components/html-viewer';
 import { QuadroCanvas } from './components/quadro-canvas';
 import { PrivateLibrary } from './components/private-library';
@@ -134,12 +135,13 @@ function App() {
     hasUnsavedChanges,
     actions,
   } = useDashboard();
-  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { session, user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [pathname, setPathname] = useState(getCurrentPath);
   const [activeView, setActiveView] = useState('workspace');
   const [isImportingData, setIsImportingData] = useState(false);
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
   const [canvasFocusRequest, setCanvasFocusRequest] = useState(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [publicLibraryModules, setPublicLibraryModules] = useState([]);
@@ -1078,6 +1080,21 @@ function App() {
         />
 
         <main data-main-shell className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+          {!isAiPanelOpen ? (
+            <button
+              type="button"
+              onClick={() => setIsAiPanelOpen(true)}
+              className="absolute right-0 top-1/2 z-[65] flex -translate-y-1/2 items-center gap-1 border border-r-0 border-[#5a5853] bg-[#181817] px-2 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#ecebe8]"
+              aria-label="Abrir Assistente IA"
+              title="Abrir Assistente IA"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4" aria-hidden="true">
+                <path d="M12 3l1.3 4.2L17 9l-3.7 1.8L12 15l-1.3-4.2L7 9l3.7-1.8L12 3z" />
+                <path d="M5 15l.8 2.2L8 18l-2.2.8L5 21l-.8-2.2L2 18l2.2-.8L5 15z" />
+              </svg>
+              IA
+            </button>
+          ) : null}
           {activeView !== 'workspace' || !selectedSection ? (
             <button
               type="button"
@@ -1163,6 +1180,7 @@ function App() {
             </div>
           ) : null}
         </main>
+        <AiPanel isOpen={isAiPanelOpen} session={session} onClose={() => setIsAiPanelOpen(false)} />
       </div>
     </div>
   );
