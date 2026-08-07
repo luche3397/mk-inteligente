@@ -8,7 +8,9 @@ const serializeWorkspaceTitle = ({ label, color, position, hidden = false }) =>
 
 export const serializeTabContent = (tab) =>
   JSON.stringify({
-    type: tab.type === 'module' || tab.type === 'note' || tab.type === 'pdf' ? tab.type : 'html',
+    type: tab.type === 'module' || tab.type === 'mk' || tab.type === 'note' || tab.type === 'pdf'
+      ? tab.type === 'note' ? 'mk' : tab.type
+      : 'html',
     content: typeof tab.content === 'string' ? tab.content : '',
     fileUrl: typeof tab.fileUrl === 'string' ? tab.fileUrl : null,
     noteZoom: typeof tab.noteZoom === 'number' ? tab.noteZoom : 1,

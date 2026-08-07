@@ -26,7 +26,7 @@ const overlayButtonClass =
 const formatTypeLabel = (value) => {
   if (value === 'module') return 'Módulo';
   if (value === 'pdf') return 'PDF';
-  if (value === 'note') return 'Nota';
+  if (value === 'mk' || value === 'note') return 'MK';
   return 'HTML';
 };
 

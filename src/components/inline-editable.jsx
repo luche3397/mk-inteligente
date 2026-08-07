@@ -8,6 +8,7 @@ export function InlineEditable({
   inputClassName = '',
   title,
   style,
+  ...buttonProps
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -56,6 +57,7 @@ export function InlineEditable({
       onDoubleClick={() => setIsEditing(true)}
       className={className}
       style={style}
+      {...buttonProps}
     >
       {value}
     </button>

@@ -133,7 +133,10 @@ const parseTabContent = (value = '') => {
 
     if (parsed && typeof parsed === 'object') {
       return {
-        type: parsed.type === 'module' || parsed.type === 'note' || parsed.type === 'pdf' ? parsed.type : 'html',
+        type:
+          parsed.type === 'module' || parsed.type === 'mk' || parsed.type === 'note' || parsed.type === 'pdf'
+            ? parsed.type === 'note' ? 'mk' : parsed.type
+            : 'html',
         content: typeof parsed.content === 'string' ? parsed.content : '',
         fileUrl: typeof parsed.fileUrl === 'string' ? parsed.fileUrl : null,
         noteZoom: typeof parsed.noteZoom === 'number' ? parsed.noteZoom : 1,
@@ -928,8 +931,8 @@ export function DashboardProvider({ children }) {
           let viewMode = module.viewMode === 'quadro' ? 'quadro' : 'content';
           let canvasDocument = module.canvasDocument && typeof module.canvasDocument === 'object' ? module.canvasDocument : null;
           let moduleType =
-            module.module_type === 'module' || module.module_type === 'note' || module.module_type === 'pdf'
-              ? module.module_type
+            module.module_type === 'module' || module.module_type === 'mk' || module.module_type === 'note' || module.module_type === 'pdf'
+              ? module.module_type === 'note' ? 'mk' : module.module_type
               : 'html';
 
           if (content) {
@@ -945,7 +948,9 @@ export function DashboardProvider({ children }) {
                     ? parsed.canvasDocument
                     : canvasDocument;
                 moduleType =
-                  parsed.type === 'module' || parsed.type === 'note' || parsed.type === 'pdf' ? parsed.type : moduleType;
+                  parsed.type === 'module' || parsed.type === 'mk' || parsed.type === 'note' || parsed.type === 'pdf'
+                    ? parsed.type === 'note' ? 'mk' : parsed.type
+                    : moduleType;
               }
             } catch {
               // raw content fallback

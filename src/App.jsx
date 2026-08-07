@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { CadastroPage, LoginPage } from './components/auth-page';
 import { HtmlViewer } from './components/html-viewer';
 import { QuadroCanvas } from './components/quadro-canvas';
 import { PrivateLibrary } from './components/private-library';
-import { NoteEditor } from './components/note-editor';
 import { PublicLibrary } from './components/public-library';
 import { Sidebar } from './components/sidebar';
 import { TabBar } from './components/tab-bar';
@@ -14,6 +13,9 @@ import { supabase } from '@/supabaseClient';
 
 const AUTH_PATHS = ['/login', '/cadastro'];
 const TAB_STATUSES = ['novo', 'em revisão', 'aprovado', 'publicado'];
+const MarkdownEditor = lazy(() =>
+  import('./components/markdown-editor').then((module) => ({ default: module.MarkdownEditor })),
+);
 
 const sanitizeFileName = (name) => {
   const extensionIndex = name.lastIndexOf('.');
@@ -69,7 +71,7 @@ const parsePrivateModuleContent = (content, fallback = {}) => {
     if (parsed && typeof parsed === 'object' && parsed.version === 1 && typeof parsed.type === 'string') {
       return {
         name: typeof parsed.name === 'string' ? parsed.name : fallback.name ?? '',
-        type: parsed.type,
+        type: parsed.type === 'note' ? 'mk' : parsed.type,
         content: typeof parsed.content === 'string' ? parsed.content : '',
         fileUrl: typeof parsed.fileUrl === 'string' ? parsed.fileUrl : null,
         noteZoom: typeof parsed.noteZoom === 'number' ? parsed.noteZoom : 1,
@@ -87,6 +89,9 @@ const parsePrivateModuleContent = (content, fallback = {}) => {
 
 const isPdfFile = (file) =>
   file?.type === 'application/pdf' || file?.name?.toLowerCase().endsWith('.pdf');
+
+const isMkFile = (file) =>
+  file?.type === 'text/markdown' || /\.(mk|md)$/i.test(file?.name ?? '');
 
 const getNextStatus = (currentStatus) => {
   const currentIndex = TAB_STATUSES.indexOf(currentStatus);
@@ -144,6 +149,7 @@ function App() {
   const [isPrivateLibraryUploading, setIsPrivateLibraryUploading] = useState(false);
   const [pendingImportModule, setPendingImportModule] = useState(null);
   const htmlModuleInputRef = useRef(null);
+  const mkInputRef = useRef(null);
   const pdfInputRef = useRef(null);
   const publicLibraryInputRef = useRef(null);
   const privateLibraryInputRef = useRef(null);
@@ -307,6 +313,19 @@ function App() {
     }
   };
 
+  const handleImportMk = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !activeTab) return;
+
+    try {
+      const content = await file.text();
+      updateCurrentTab({ type: 'mk', content, fileUrl: null, noteZoom: 1, status: 'novo' });
+    } finally {
+      setIsImportMenuOpen(false);
+      event.target.value = '';
+    }
+  };
+
   const handleImportComputerFileToPrivateLibrary = async (event) => {
     const file = event.target.files?.[0];
     if (!file || !user?.id) return;
@@ -316,8 +335,9 @@ function App() {
     try {
       const fileName = file.name;
       const isPdf = isPdfFile(file);
+      const isMk = isMkFile(file);
       const content = isPdf ? await readFileAsDataUrl(file) : await file.text();
-      const moduleType = isPdf ? 'pdf' : detectTabType(content);
+      const moduleType = isPdf ? 'pdf' : isMk ? 'mk' : detectTabType(content);
       const fileUrl = content || 'about:blank';
 
       const { error } = await supabase.from('modules').insert([
@@ -694,8 +714,8 @@ function App() {
                     <span className="rounded-full border border-[#3a404d] bg-[#2a2f3a]/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-[#d4d4d8]">
                       {activeTab.type === 'module'
                         ? 'Módulo'
-                        : activeTab.type === 'note'
-                          ? 'Nota'
+                        : activeTab.type === 'mk' || activeTab.type === 'note'
+                          ? 'MK'
                           : activeTab.type === 'pdf'
                           ? 'PDF'
                           : 'HTML'}
@@ -724,6 +744,13 @@ function App() {
                     accept=".html,text/html"
                     className="hidden"
                     onChange={handleImportWorkspaceFile}
+                  />
+                  <input
+                    ref={mkInputRef}
+                    type="file"
+                    accept=".mk,.md,text/markdown,text/plain"
+                    className="hidden"
+                    onChange={handleImportMk}
                   />
                   <input
                     ref={pdfInputRef}
@@ -755,16 +782,16 @@ function App() {
                     type="button"
                     onClick={() =>
                       updateCurrentTab({
-                        type: 'note',
-                        content: activeTab?.type === 'note' ? activeTab.content : '',
+                        type: 'mk',
+                        content: activeTab?.type === 'mk' || activeTab?.type === 'note' ? activeTab.content : '',
                         fileUrl: null,
-                        noteZoom: activeTab?.type === 'note' ? activeTab.noteZoom ?? 1 : 1,
-                        status: activeTab?.type === 'note' ? activeTab.status ?? 'novo' : 'novo',
+                        noteZoom: activeTab?.type === 'mk' || activeTab?.type === 'note' ? activeTab.noteZoom ?? 1 : 1,
+                        status: activeTab?.type === 'mk' || activeTab?.type === 'note' ? activeTab.status ?? 'novo' : 'novo',
                       })
                     }
                     className="shrink-0 rounded-lg border border-[#3a404d] bg-transparent px-3 py-1.5 text-xs font-medium text-white transition duration-200 hover:bg-[#2f3542]"
                   >
-                    Nova Nota
+                    Novo MK
                   </button>
                   <button
                     type="button"
@@ -791,6 +818,14 @@ function App() {
                         >
                           <span>Html ou Módulo</span>
                           <span className="text-xs uppercase tracking-[0.2em] text-[#7b818d]">HTML</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => mkInputRef.current?.click()}
+                          className="flex w-full items-center justify-between border-t border-[#2a2f3a] px-4 py-3 text-left text-sm text-white transition duration-200 hover:bg-white/[0.04]"
+                        >
+                          <span>Documento Markdown</span>
+                          <span className="text-xs uppercase tracking-[0.2em] text-[#7b818d]">MK</span>
                         </button>
                         <button
                           type="button"
@@ -825,13 +860,15 @@ function App() {
                     onExit={handleToggleQuadro}
                     onUploadImage={handleUploadQuadroImage}
                   />
-                ) : activeTab.type === 'note' ? (
-                  <NoteEditor
-                    value={activeTab.content}
-                    zoom={activeTab.noteZoom ?? 1}
-                    onChange={(content) => updateCurrentTab({ content })}
-                    onZoomChange={(noteZoom) => updateCurrentTab({ noteZoom })}
-                  />
+                ) : activeTab.type === 'mk' || activeTab.type === 'note' ? (
+                  <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-[#8C8A85]">Carregando editor MK...</div>}>
+                    <MarkdownEditor
+                      value={activeTab.content}
+                      zoom={activeTab.noteZoom ?? 1}
+                      onChange={(content) => updateCurrentTab({ content })}
+                      onZoomChange={(noteZoom) => updateCurrentTab({ noteZoom })}
+                    />
+                  </Suspense>
                 ) : activeTab.type === 'pdf' && activeTab.fileUrl ? (
                   <HtmlViewer src={activeTab.fileUrl} expandable mode="pdf" />
                 ) : activeTab.content || activeTab.fileUrl ? (
@@ -846,7 +883,7 @@ function App() {
                   )
                 ) : (
                   <div className="flex h-full min-h-[280px] items-center justify-center rounded-[24px] border border-dashed border-[#3a404d] bg-[#0f1115]/70 p-6 text-center text-[#a1a1aa]">
-                    Nenhum conteudo importado nesta aba. Use "Importar" para adicionar HTML, modulo ou PDF.
+                    Nenhum conteúdo nesta aba. Use "Novo MK" ou "Importar" para adicionar Markdown, HTML, módulo ou PDF.
                   </div>
                 )}
               </div>
@@ -1000,7 +1037,7 @@ function App() {
                 <input
                   ref={privateLibraryInputRef}
                   type="file"
-                  accept=".html,text/html,.pdf,application/pdf"
+                  accept=".html,text/html,.mk,.md,text/markdown,text/plain,.pdf,application/pdf"
                   className="hidden"
                   onChange={handleImportComputerFileToPrivateLibrary}
                 />

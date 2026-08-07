@@ -134,7 +134,8 @@ export function Sidebar({
                       item.type === 'title' ? 'text-sm font-semibold' : 'text-sm font-medium text-white'
                     }`}
                     inputClassName="w-full rounded-lg border border-[#3a404d] bg-[#0f1115] px-2 py-1 text-sm text-white"
-                    style={item.type === 'title' ? { color: item.color } : undefined}
+                    data-title-color={item.type === 'title' ? true : undefined}
+                    style={item.type === 'title' ? { '--title-color': item.color } : undefined}
                   />
 
                   {item.type === 'title' ? (

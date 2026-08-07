@@ -51,8 +51,8 @@ const normalizeTab = (tab, index) => {
   const content =
     typeof tab.content === 'string' ? tab.content : typeof tab.htmlContent === 'string' ? tab.htmlContent : '';
   const type =
-    tab.type === 'module' || tab.type === 'html' || tab.type === 'note' || tab.type === 'pdf'
-      ? tab.type
+    tab.type === 'module' || tab.type === 'html' || tab.type === 'mk' || tab.type === 'note' || tab.type === 'pdf'
+      ? tab.type === 'note' ? 'mk' : tab.type
       : detectTabType(content);
 
   return {

@@ -54,6 +54,7 @@ test('snapshot completo não mantém abas removidas e preserva todo o conteúdo 
   assert.deepEqual(snapshot.tabIds, ['tab-current']);
   assert.equal(snapshot.tabs.some((tab) => tab.id === 'tab-removed'), false);
   assert.equal(savedContent.content, 'conteúdo mais recente');
+  assert.equal(savedContent.type, 'mk');
   assert.equal(savedContent.noteZoom, 1.2);
   assert.equal(savedContent.status, 'em revisão');
 });
