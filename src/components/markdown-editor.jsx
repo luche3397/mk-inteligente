@@ -125,7 +125,7 @@ export function MarkdownEditor({ value, zoom = 1, onChange, onZoomChange, onUplo
             onPaste={handlePaste}
             placeholder="# Titulo\n\nEscreva seu documento em Markdown ou cole uma imagem..."
             spellCheck
-            className={`h-full min-h-0 w-full resize-none overflow-auto bg-[#1F1E1D] px-5 py-5 font-mono outline-none ${mode === 'split' ? 'border-r border-[#5A5853]' : ''}`}
+            className={`mk-editor-input h-full min-h-0 w-full resize-none overflow-auto px-5 py-5 font-mono outline-none ${mode === 'split' ? 'border-r border-[#5A5853]' : ''}`}
             style={{ fontSize: `${15 * zoom}px`, lineHeight: 1.7, overflowAnchor: 'none' }}
           />
         ) : null}
