@@ -727,14 +727,14 @@ function App() {
           onReorderTab={(tabId, targetTabId) => actions.reorderTab(selectedSection.id, tabId, targetTabId)}
         />
 
-        <div className="min-h-0 flex-1 overflow-hidden p-2 sm:p-3">
+        <div className="min-h-0 flex-1 overflow-hidden p-1.5 sm:p-2">
           {activeTab ? (
-            <div data-workspace-container className="flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-[#2a2f3a] bg-white/[0.045] shadow-[0_24px_80px_rgba(0,0,0,0.32)] backdrop-blur-xl sm:rounded-[30px]">
-              <div className="flex items-center gap-2 overflow-x-auto border-b border-[#2a2f3a] px-3 py-1.5 sm:px-4 xl:overflow-visible">
-                <div className="flex shrink-0 items-center gap-2">
+            <div data-workspace-container className="flex h-full min-h-0 flex-col overflow-hidden border border-[#2a2f3a] bg-white/[0.025]">
+              <div data-context-toolbar className="flex min-h-11 items-center gap-2 overflow-x-auto border-b border-[#2a2f3a] px-2.5 py-1 xl:overflow-visible">
+                <div className="flex min-w-0 shrink-0 items-center gap-2">
                   <div className="flex min-w-0 items-center gap-2">
-                    <h3 className="max-w-[180px] truncate text-sm font-semibold text-white sm:max-w-[260px] sm:text-base">{activeTab.name}</h3>
-                    <span className="rounded-full border border-[#3a404d] bg-[#2a2f3a]/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-[#d4d4d8]">
+                    <h3 className="max-w-[160px] truncate text-sm font-semibold text-white sm:max-w-[220px]">{activeTab.name}</h3>
+                    <span className="border border-[#3a404d] px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.16em] text-[#d4d4d8]">
                       {activeTab.type === 'module'
                         ? 'Módulo'
                         : activeTab.type === 'mk' || activeTab.type === 'note'
@@ -750,17 +750,17 @@ function App() {
                           status: getNextStatus(activeTab.status),
                         })
                       }
-                      className="rounded-full border border-[#3a404d] bg-[#20232a]/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-[#d4d4d8] transition duration-200 hover:bg-[#2f3542]"
+                      className="border border-[#3a404d] px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.16em] text-[#d4d4d8] transition duration-150"
                     >
                       {getStatusLabel(activeTab.status)}
                     </button>
                   </div>
-                  <p className="max-w-[220px] truncate text-[11px] text-[#8f95a3] sm:max-w-[320px]">
+                  <p className="max-w-[180px] truncate text-[10px] text-[#8f95a3] sm:max-w-[280px]">
                     {[selectedTitle?.title, selectedSection.name].filter(Boolean).join(' / ')}
                   </p>
                 </div>
 
-                <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                <div className="ml-auto flex shrink-0 items-center gap-0.5">
                   <input
                     ref={htmlModuleInputRef}
                     type="file"
@@ -785,7 +785,8 @@ function App() {
                   <button
                     type="button"
                     onClick={handleSaveCurrentTabToPrivateLibrary}
-                    className="shrink-0 rounded-lg border border-[#3a404d] bg-[#1f3b2d] px-3 py-1.5 text-xs font-medium text-white transition duration-200 hover:bg-[#28503d]"
+                    data-ui-variant="primary"
+                    className="h-8 shrink-0 border px-2.5 text-xs font-semibold transition duration-150"
                   >
                     Guardar
                   </button>
@@ -793,10 +794,11 @@ function App() {
                     type="button"
                     onClick={handleToggleQuadro}
                     aria-pressed={activeTab.viewMode === 'quadro'}
-                    className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium text-white transition duration-200 ${
+                    data-ui-variant="secondary"
+                    className={`h-8 shrink-0 border px-2.5 text-xs font-medium text-white transition duration-150 ${
                       activeTab.viewMode === 'quadro'
-                        ? 'border-[#7c83ff] bg-[#3a3f6b] hover:bg-[#4a4f7a]'
-                        : 'border-[#3a404d] bg-[#20232a] hover:bg-[#2f3542]'
+                        ? 'border-[#7c83ff] bg-[#3a3f6b]'
+                        : 'border-transparent'
                     }`}
                   >
                     Quadro
@@ -812,14 +814,16 @@ function App() {
                         status: activeTab?.type === 'mk' || activeTab?.type === 'note' ? activeTab.status ?? 'novo' : 'novo',
                       })
                     }
-                    className="shrink-0 rounded-lg border border-[#3a404d] bg-transparent px-3 py-1.5 text-xs font-medium text-white transition duration-200 hover:bg-[#2f3542]"
+                    data-ui-variant="secondary"
+                    className="h-8 shrink-0 border border-transparent px-2.5 text-xs font-medium text-white transition duration-150"
                   >
                     Novo MK
                   </button>
                   <button
                     type="button"
                     onClick={() => activeTab && actions.duplicateTab(selectedSection.id, activeTab.id)}
-                    className="shrink-0 rounded-lg border border-[#3a404d] bg-[#20232a] px-3 py-1.5 text-xs font-medium text-white transition duration-200 hover:bg-[#2f3542]"
+                    data-ui-variant="secondary"
+                    className="h-8 shrink-0 border border-transparent px-2.5 text-xs font-medium text-white transition duration-150"
                   >
                     Duplicar
                   </button>
@@ -827,17 +831,18 @@ function App() {
                     <button
                       type="button"
                       onClick={() => setIsImportMenuOpen((current) => !current)}
-                      className="rounded-lg border border-[#3a404d] bg-[#20232a] px-3 py-1.5 text-xs font-medium text-white transition duration-200 hover:bg-[#2f3542]"
+                      data-ui-variant="secondary"
+                      className="h-8 border border-transparent px-2.5 text-xs font-medium text-white transition duration-150"
                     >
                       Importar
                     </button>
 
                     {isImportMenuOpen ? (
-                      <div className="fixed right-2 top-[92px] z-[90] w-56 overflow-hidden rounded-2xl border border-[#2a2f3a] bg-[#171a20] shadow-[0_24px_80px_rgba(0,0,0,0.35)] xl:absolute xl:right-0 xl:top-full xl:z-20 xl:mt-2">
+                      <div className="fixed right-2 top-[78px] z-[90] w-52 overflow-hidden border border-[#2a2f3a] bg-[#171a20] p-1 xl:absolute xl:right-0 xl:top-full xl:z-20 xl:mt-1">
                         <button
                           type="button"
                           onClick={() => htmlModuleInputRef.current?.click()}
-                          className="flex w-full items-center justify-between px-4 py-3 text-left text-sm text-white transition duration-200 hover:bg-white/[0.04]"
+                          className="flex w-full items-center justify-between px-2.5 py-2 text-left text-xs text-white transition duration-150"
                         >
                           <span>Html ou Módulo</span>
                           <span className="text-xs uppercase tracking-[0.2em] text-[#7b818d]">HTML</span>
@@ -845,7 +850,7 @@ function App() {
                         <button
                           type="button"
                           onClick={() => mkInputRef.current?.click()}
-                          className="flex w-full items-center justify-between border-t border-[#2a2f3a] px-4 py-3 text-left text-sm text-white transition duration-200 hover:bg-white/[0.04]"
+                          className="flex w-full items-center justify-between px-2.5 py-2 text-left text-xs text-white transition duration-150"
                         >
                           <span>Documento Markdown</span>
                           <span className="text-xs uppercase tracking-[0.2em] text-[#7b818d]">MK</span>
@@ -853,7 +858,7 @@ function App() {
                         <button
                           type="button"
                           onClick={() => pdfInputRef.current?.click()}
-                          className="flex w-full items-center justify-between border-t border-[#2a2f3a] px-4 py-3 text-left text-sm text-white transition duration-200 hover:bg-white/[0.04]"
+                          className="flex w-full items-center justify-between px-2.5 py-2 text-left text-xs text-white transition duration-150"
                         >
                           <span>PDF</span>
                           <span className="text-xs uppercase tracking-[0.2em] text-[#7b818d]">PDF</span>
@@ -864,7 +869,7 @@ function App() {
                             setIsImportMenuOpen(false);
                             setActiveView('library-private');
                           }}
-                          className="flex w-full items-center justify-between border-t border-[#2a2f3a] px-4 py-3 text-left text-sm text-white transition duration-200 hover:bg-white/[0.04]"
+                          className="flex w-full items-center justify-between px-2.5 py-2 text-left text-xs text-white transition duration-150"
                         >
                           <span>Da biblioteca</span>
                           <span className="text-xs uppercase tracking-[0.2em] text-[#7b818d]">PRIVATE</span>
@@ -875,7 +880,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-auto p-2 sm:p-3">
+              <div className="min-h-0 flex-1 overflow-auto p-1.5 sm:p-2">
                 {activeTab.viewMode === 'quadro' ? (
                   <QuadroCanvas
                     documentValue={activeTab.canvasDocument ?? createDefaultCanvasDocument()}

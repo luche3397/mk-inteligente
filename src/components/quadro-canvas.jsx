@@ -131,7 +131,7 @@ function CanvasNode({ node, selected, hovered, connectionTarget, editing, lowDet
       data-node-id={node.id}
       data-node-type={node.type}
       data-canvas-node
-      className={`absolute cursor-grab select-none rounded-2xl border shadow-[0_14px_34px_rgba(0,0,0,0.28)] active:cursor-grabbing ${
+      className={`absolute cursor-grab select-none border active:cursor-grabbing ${
         node.type === 'group' ? 'bg-[#15182180]' : 'bg-[#191c23]'
       }`}
       style={{ left: node.x, top: node.y, width: node.width, height: node.height, zIndex: node.zIndex, ...colorStyle }}
@@ -156,7 +156,7 @@ function CanvasNode({ node, selected, hovered, connectionTarget, editing, lowDet
                 event.currentTarget.blur();
               }
             }}
-            className="h-full w-full resize-none select-text rounded-2xl bg-transparent px-4 py-3 text-sm leading-6 text-white outline-none"
+            className="h-full w-full resize-none select-text bg-transparent px-4 py-3 text-sm leading-6 text-white outline-none"
           />
         ) : (
           <div className="h-full overflow-hidden whitespace-pre-wrap break-words px-4 py-3 text-sm leading-6 text-white">
@@ -166,7 +166,7 @@ function CanvasNode({ node, selected, hovered, connectionTarget, editing, lowDet
       ) : null}
 
       {node.type === 'image' ? (
-        <button type="button" className="group relative h-full w-full overflow-hidden rounded-2xl" onDoubleClick={() => onOpenImage(node.image?.src)}>
+        <button type="button" className="group relative h-full w-full overflow-hidden" onDoubleClick={() => onOpenImage(node.image?.src)}>
           <img src={node.image?.src} alt={node.image?.alt || node.caption || 'Imagem do quadro'} loading="lazy" className="h-full w-full object-contain" draggable={false} />
           {node.caption ? <span className="absolute inset-x-0 bottom-0 bg-black/60 px-3 py-2 text-left text-xs text-white">{node.caption}</span> : null}
         </button>
@@ -212,8 +212,8 @@ function FloatingButton({ children, onClick, title, disabled = false, active = f
       title={title}
       aria-label={title}
       aria-pressed={active}
-      className={`rounded-xl border px-3 py-2 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-35 ${
-        active ? 'border-[#ECEBE8] bg-[#3D3C3A]' : 'border-[#3A3936] bg-[#2D2C2B] hover:bg-[#3D3C3A]'
+      className={`h-8 border px-2 text-xs font-medium text-white transition duration-150 disabled:cursor-not-allowed disabled:opacity-35 ${
+        active ? 'border-[#ECEBE8] bg-[#3D3C3A]' : 'border-transparent bg-transparent'
       }`}
     >
       {children}
@@ -924,22 +924,24 @@ export function QuadroCanvas({ documentValue, onChange, onExit, onUploadImage })
         </div>
       ) : null}
 
-      <div onPointerDown={(event) => event.stopPropagation()} className="absolute right-4 top-4 z-50 flex flex-wrap items-center gap-2 rounded-2xl border border-[#2a2f3a] bg-[#11141aeb] p-2 text-white shadow-lg backdrop-blur-xl">
+      <div data-canvas-zoom-toolbar onPointerDown={(event) => event.stopPropagation()} className="absolute right-2 top-2 z-50 flex min-h-9 flex-wrap items-center gap-0.5 border border-[#2a2f3a] bg-[#11141aeb] p-0.5 text-white">
         <FloatingButton title="Diminuir zoom" onClick={() => { const rect = getRect(); if (rect) zoomAt(documentState.viewport.zoom - 0.12, rect.left + rect.width / 2, rect.top + rect.height / 2); }}>−</FloatingButton>
-        <span className="min-w-14 text-center text-xs font-semibold">{Math.round(documentState.viewport.zoom * 100)}%</span>
+        <span className="min-w-11 text-center text-[11px] font-semibold">{Math.round(documentState.viewport.zoom * 100)}%</span>
         <FloatingButton title="Aumentar zoom" onClick={() => { const rect = getRect(); if (rect) zoomAt(documentState.viewport.zoom + 0.12, rect.left + rect.width / 2, rect.top + rect.height / 2); }}>+</FloatingButton>
-        <FloatingButton title="Ajustar tudo (Shift+1)" onClick={() => fitNodes()}>Ajustar tudo</FloatingButton>
+        <FloatingButton title="Ajustar tudo (Shift+1)" onClick={() => fitNodes()}>Ajustar</FloatingButton>
         <FloatingButton title="Ajustar seleção (Shift+2)" disabled={!selection.nodeIds.length} onClick={() => fitNodes(selection.nodeIds)}>Seleção</FloatingButton>
         <FloatingButton title="Resetar zoom" onClick={() => setDocument({ ...documentRef.current, viewport: { ...documentRef.current.viewport, zoom: 1 } }, true)}>100%</FloatingButton>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-4 z-50 flex justify-center px-4">
-        <div onPointerDown={(event) => event.stopPropagation()} className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-2 rounded-2xl border border-[#2a2f3a] bg-[#11141aeb] p-2 shadow-[0_24px_80px_rgba(0,0,0,.4)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-x-0 bottom-2 z-50 flex justify-center px-2">
+        <div data-canvas-command-bar onPointerDown={(event) => event.stopPropagation()} className="pointer-events-auto flex min-h-10 max-w-full flex-wrap items-center justify-center gap-0.5 border border-[#2a2f3a] bg-[#11141aeb] p-1">
           <FloatingButton title="Criar cartão de texto" onClick={() => addTextAt(viewportCenter())}>Texto</FloatingButton>
           <FloatingButton title="Inserir imagem" onClick={() => fileInputRef.current?.click()}>Imagem</FloatingButton>
           <FloatingButton title="Criar grupo" onClick={createGroup}>Grupo</FloatingButton>
-          <FloatingButton title="Desfazer (Ctrl+Z)" disabled={!historyRef.current.past.length} onClick={undo}>Desfazer</FloatingButton>
-          <FloatingButton title="Refazer (Ctrl+Y)" disabled={!historyRef.current.future.length} onClick={redo}>Refazer</FloatingButton>
+          <span aria-hidden="true" className="mx-1 h-5 w-px bg-[#3a404d]" />
+          <FloatingButton title="Desfazer (Ctrl+Z)" disabled={!historyRef.current.past.length} onClick={undo}>↶</FloatingButton>
+          <FloatingButton title="Refazer (Ctrl+Y)" disabled={!historyRef.current.future.length} onClick={redo}>↷</FloatingButton>
+          <span aria-hidden="true" className="mx-1 h-5 w-px bg-[#3a404d]" />
           <FloatingButton title="Exportar quadro" onClick={exportCanvas}>Exportar</FloatingButton>
           <FloatingButton title="Importar quadro" onClick={() => importInputRef.current?.click()}>Importar</FloatingButton>
           <FloatingButton title="Voltar ao conteúdo" onClick={onExit}>Voltar</FloatingButton>

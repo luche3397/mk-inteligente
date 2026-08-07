@@ -52,7 +52,7 @@ export function ModuleLibrary({
 }) {
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center p-8 text-sm text-[#a1a1aa]">
+      <div className="flex h-full items-center justify-center p-4 text-sm text-[#a1a1aa]">
         Carregando...
       </div>
     );
@@ -60,7 +60,7 @@ export function ModuleLibrary({
 
   return (
     <div className="flex h-full min-h-0 flex-col p-2 sm:p-5">
-      <div className="mb-2 flex items-center justify-between gap-3 rounded-[20px] border border-[#2a2f3a] bg-white/[0.045] px-3 py-3 shadow-[0_24px_80px_rgba(0,0,0,0.2)] backdrop-blur-xl sm:mb-5 sm:rounded-[28px] sm:px-5 sm:py-4">
+      <div className="mb-2 flex items-center justify-between gap-3 border border-[#2a2f3a] bg-white/[0.025] px-3 py-2 sm:px-4">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-[#a1a1aa]">{title}</p>
           <h3 className="mt-1 text-lg font-semibold text-white">{subtitle}</h3>
@@ -69,25 +69,25 @@ export function ModuleLibrary({
         <button
           type="button"
           onClick={onUploadClick}
-          className="rounded-2xl border border-[#3a404d] bg-[#20232a] px-4 py-2 text-sm font-semibold text-white transition duration-200 hover:bg-[#2f3542]"
+          className="h-8 border border-[#3a404d] px-3 text-xs font-semibold text-white transition duration-150"
         >
           {isUploading ? 'Enviando...' : uploadLabel}
         </button>
       </div>
 
       {modules.length === 0 ? (
-        <div className="flex min-h-[220px] flex-1 items-center justify-center rounded-[20px] border border-dashed border-[#3a404d] bg-white/[0.04] p-4 text-center text-[#a1a1aa] sm:min-h-[280px] sm:rounded-[30px] sm:p-8">
+        <div className="flex min-h-[220px] flex-1 items-center justify-center border border-dashed border-[#3a404d] bg-white/[0.025] p-4 text-center text-[#a1a1aa] sm:min-h-[280px] sm:p-6">
           {emptyMessage}
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto rounded-[20px] border border-[#2a2f3a] bg-white/[0.035] p-3 shadow-[0_24px_80px_rgba(0,0,0,0.16)] backdrop-blur-xl sm:rounded-[30px] sm:p-6">
+        <div className="min-h-0 flex-1 overflow-auto border border-[#2a2f3a] bg-white/[0.025] p-3 sm:p-4">
           <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] sm:gap-5">
             {modules.map((module) => (
               <button
                 key={module.id ?? module.file_url ?? module.title}
                 type="button"
                 onClick={() => onModuleClick?.(module)}
-                className="group relative flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-[24px] border border-[#2a2f3a] bg-[#171a20] px-4 py-6 text-center transition duration-200 hover:-translate-y-0.5 hover:border-[#3a404d] hover:bg-[#1d2128]"
+                className="group relative flex min-h-[180px] cursor-pointer flex-col items-center justify-center border border-[#2a2f3a] bg-[#171a20] px-4 py-5 text-center transition duration-150 hover:border-[#3a404d] hover:bg-[#1d2128]"
               >
                 <div className="absolute right-3 top-3 flex items-center gap-2">
                   <button
